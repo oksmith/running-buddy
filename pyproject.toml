@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "running-buddy"
+version = "0.1.0"
+description = "An AI helper to manage and query recent Strava activities"
+authors = ["oksmith <ollie.smith@ravelin.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+langchain = "^0.3.14"
+langchain-community = "^0.3.14"
+duckduckgo-search = "^7.2.1"
+requests = "^2.32.3"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

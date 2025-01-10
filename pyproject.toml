@@ -11,6 +11,8 @@ langchain = "^0.3.14"
 langchain-community = "^0.3.14"
 duckduckgo-search = "^7.2.1"
 requests = "^2.32.3"
+fastapi = "^0.115.6"
+uvicorn = "^0.34.0"
 
 
 [tool.poetry.group.dev.dependencies]

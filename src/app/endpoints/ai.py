@@ -28,6 +28,7 @@ async def chat_with_agent(request: ChatRequest):
 
         # Invoke agent, extract the output
         # e.g. result: {'input': "What's the weather like in London today?", 'chat_history': [], 'output': 'Today in London, the ....'}
+        print(request.message, chat_history)
         result = agent_executor.invoke(
             {"input": request.message, "chat_history": chat_history}
         )

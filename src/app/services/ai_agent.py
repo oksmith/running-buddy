@@ -7,7 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
-from src.app import utils
+from src.app.utils import fetch_map_details
 
 load_dotenv()
 
@@ -17,15 +17,24 @@ OPENAI_MODEL = "gpt-4o-mini"
 class GetActivitiesInput(BaseModel):
     question: str = Field(..., description="A question about the user's activities.")
 
+
 class SelectActivityInput(BaseModel):
     question: str = Field(..., description="A question about the user's activities.")
-    activities: List[Dict] = Field(..., description="A list of dictionaries containing activity information.")
+    activities: List[Dict] = Field(
+        ..., description="A list of dictionaries containing activity information."
+    )
+
 
 class GetMapInformationInput(BaseModel):
-    activity: Dict = Field(..., description="A dictionary containing activity information.")
+    activity: Dict = Field(
+        ..., description="A dictionary containing activity information."
+    )
+
 
 @tool(args_schema=GetActivitiesInput)
-def get_activities(question: str, n_days: int = 7, location: str = "data/activities.json") -> Dict:
+def get_activities(
+    question: str, n_days: int = 7, location: str = "data/activities.json"
+) -> Dict:
     """
     Retrieve a list of the user's past activities from the activity database (e.g., running or cycling activities).
     This tool is specifically designed for questions that require details about the user's performance, such as distance,
@@ -50,6 +59,7 @@ def get_activities(question: str, n_days: int = 7, location: str = "data/activit
 #     """Async version of retrieving activities."""
 #     return get_activities(n_days, location)
 
+
 @tool(args_schema=SelectActivityInput)
 def select_activity(question: str, activities: Dict) -> Dict:
     """
@@ -57,7 +67,7 @@ def select_activity(question: str, activities: Dict) -> Dict:
     considers fields such as the name, date, or other metadata of the activity.
 
     Args:
-        question (str): A natural language question or query from the user. 
+        question (str): A natural language question or query from the user.
                         Example: "Tell me about my longest run this week."
         activities (List[Dict]): A list of activity dictionaries, each containing fields like name, date, distance, and duration.
 
@@ -91,7 +101,11 @@ def get_map_information(activity: Dict) -> str:
     When to use:
         Use this tool to answer queries about nearby landmarks, streets, or geographical context of an activity after it has been selected as relevant.
     """
-    return utils.fetch_map_details(activity["map"]["summary_polyline"], activity["start_latlng"], activity["end_latlng"])
+    return fetch_map_details(
+        activity["map"]["summary_polyline"],
+        activity["start_latlng"],
+        activity["end_latlng"],
+    )
 
 
 # async def aget_map_information(activity: Dict) -> str:
@@ -107,7 +121,6 @@ prompt = ChatPromptTemplate.from_messages(
             (
                 # TODO: narrow the scope of the project. It is an agent which does one thing and one thing only.
                 # Asking the tool to update an activity's description: Use get_activities followed by get_relevant_activity followed by get_map_info followed by create_description
-                
                 "You are a helpful assistant. "
                 # "Strictly use the `duckduckgo_search` tool for weather-related questions only. Be precise when describing temperature and times. "
                 "Strictly use the `get_activities` tool for questions about running activities. "

@@ -79,7 +79,6 @@ async def agent_page(request: Request):
     return HTMLResponse(content=html_content)
 
 
-
 app.include_router(auth.router)
 app.include_router(ai.router)
 

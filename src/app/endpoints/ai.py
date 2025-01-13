@@ -22,7 +22,9 @@ async def chat_with_agent(request: ChatRequest):
     try:
         # Build chat history from the request
         chat_history = [
-            HumanMessage(content=msg["content"]) if msg["role"] == "human" else AIMessage(content=msg["content"])
+            HumanMessage(content=msg["content"])
+            if msg["role"] == "human"
+            else AIMessage(content=msg["content"])
             for msg in request.chat_history
         ]
 
@@ -35,7 +37,9 @@ async def chat_with_agent(request: ChatRequest):
         output = result["output"]
 
         if not isinstance(output, str):
-            raise ValueError("Unexpected result format from agent: {}".format(type(result)))
+            raise ValueError(
+                "Unexpected result format from agent: {}".format(type(result))
+            )
 
         # Add to chat history and return in the response, so that future questions have access to this
         # part of the conversation
@@ -44,7 +48,10 @@ async def chat_with_agent(request: ChatRequest):
         chat_history.append(HumanMessage(content=request.message))
         chat_history.append(AIMessage(content=output))
         formatted_chat_history = [
-            {"role": "human" if isinstance(msg, HumanMessage) else "ai", "content": msg.content}
+            {
+                "role": "human" if isinstance(msg, HumanMessage) else "ai",
+                "content": msg.content,
+            }
             for msg in chat_history
         ]
 
@@ -53,5 +60,9 @@ async def chat_with_agent(request: ChatRequest):
     except Exception as e:
         # Print the traceback for debugging purposes
         import traceback
+
         print("Error occurred:", traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"An error occurred while processing the request. Exception: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while processing the request. Exception: {e}",
+        )

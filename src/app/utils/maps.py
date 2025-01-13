@@ -10,16 +10,16 @@ load_dotenv()
 gmaps = googlemaps.Client(key=os.getenv("GOOGLE_MAPS_API_KEY"))
 
 
-def fetch_map_details(map_data: dict, landmarks: bool = True) -> str:
+def fetch_map_details(run_polyline: str, landmarks: bool = True) -> str:
     """
     Fetch nearby street names and landmarks based on the map data.
     Args:
-        map_data (dict): The input map data containing summary_polyline and start/end_latlng.
+        run_polyline (str): The input map data containing polyline.
     Returns:
         str: A formatted string with street names and landmarks.
     """
     # Decode the polyline into a list of coordinates
-    coordinates = polyline.decode(map_data["polyline"])
+    coordinates = polyline.decode(run_polyline)
     coordinates = select_equidistant_elements(
         coordinates, 10
     )  # select 10 equally spaced coordinates from the map

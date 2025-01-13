@@ -3,6 +3,8 @@ import json
 import requests
 
 
+# TODO: improve user token storage. Also make it so that it handles multiple
+# users. Maybe via cookies?
 def get_access_token() -> str:
     with open("token_storage.json", "r") as f:
         return json.load(f)["access_token"]

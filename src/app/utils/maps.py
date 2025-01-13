@@ -20,13 +20,11 @@ def fetch_map_details(run_polyline: str, landmarks: bool = True) -> str:
     """
     # Decode the polyline into a list of coordinates
     coordinates = polyline.decode(run_polyline)
-    coordinates = select_equidistant_elements(
-        coordinates, 10
-    )  # select 10 equally spaced coordinates from the map
+    
+    # select 10 equally spaced coordinates from the map
+    coordinates = select_equidistant_elements(coordinates, 10) 
 
     results = []
-
-    # Fetch information for each coordinate
     for lat, lng in coordinates:
         reverse_geocode = gmaps.reverse_geocode((lat, lng))
         if reverse_geocode:
@@ -45,8 +43,7 @@ def fetch_map_details(run_polyline: str, landmarks: bool = True) -> str:
                 if "park" in x["types"] and "tourist_attraction" in x["types"]
             ]
             if places:
-                places = [p["name"] for p in places]
-                results.append(f"{places[:3]}")
+                _ = [results.append(p["name"]) for p in places[:3]]
 
     return "\n".join(results)
 

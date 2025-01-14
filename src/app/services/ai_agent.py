@@ -8,7 +8,6 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from src.app.services import gmaps, strava
-from src.app.utils import maps
 
 load_dotenv()
 
@@ -123,10 +122,8 @@ tools = [
 ]
 
 
-# Common issues arise when:
-# The LLM doesn't preserve complete data structures
-# Schema validation fails due to missing required fields
-# The prompt doesn't clearly specify data dependencies
+# TODO: this is a very well-defined chain. What agency does my bot actually have? Interacting with the user and tweaking the poem, knowing
+# which function to use to tweak the poem, are useful things.
 prompt = ChatPromptTemplate.from_messages(
     [
         (
@@ -134,10 +131,11 @@ prompt = ChatPromptTemplate.from_messages(
             (
                 "You are a Strava activity processor. Follow these steps:\n"
                 "1. Call get_activities to fetch activities\n"
-                "2. Pass the FULL activities response along with the question to select_activity\n"
-                "3. Pass the ENTIRE selected activity object to get_map_information\n\n"
-                "IMPORTANT: When passing data between tools, preserve the complete data structure. Do not send empty objects or partial data."
+                "2. Pass the get_activities response along with the question to select_activity\n"
+                "3. Pass the select_activity response to get_map_information\n\n"
+                "4. Generate a poem using the select_activity response and the get_map_information response"
                 "IMPORTANT: If the user asks about generating a poem, use street names and parks as inspiration. Also, keep it short (4-10 lines) and make sure it rhymes."
+                "5. If the user asks to modify the poem, generate a new poem using the select_activity response and the get_map_information response using chat history."
             ),
         ),
         ("placeholder", "{chat_history}"),

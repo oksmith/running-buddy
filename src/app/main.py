@@ -25,6 +25,7 @@ async def read_root(request: Request):
 
 @app.get("/agent", response_class=HTMLResponse)
 async def agent_page(request: Request):
+    # TODO: read this from an asset file
     html_content = """
     <html>
         <head>

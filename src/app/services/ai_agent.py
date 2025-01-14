@@ -7,7 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
-from src.app.services import strava
+from src.app.services import gmaps, strava
 from src.app.utils import maps
 
 load_dotenv()
@@ -24,18 +24,22 @@ class GetActivitiesInput(BaseModel):
         default="data/activities.json", description="Activity data path"
     )
 
+
 class SelectActivityInput(BaseModel):
     question: str
     activities_file: str
+
 
 class UpdateActivityInput(BaseModel):
     question: str
     enriched_activities_file: str
 
+
 class GetMapInformationInput(BaseModel):
     activity_file: str = Field(
         ..., description="Path to JSON file containing activity data"
     )
+
 
 def save_activities(activities: List[Dict], location: str) -> None:
     with open(location, "w") as f:
@@ -45,39 +49,40 @@ def save_activities(activities: List[Dict], location: str) -> None:
 @tool(args_schema=GetActivitiesInput)
 def fetch_activities(question: str, location: str = "data/activities.json") -> str:
     """Retrieve a list of the user's past activities from Strava.
-    
+
     Args:
         question (str): The question or command the user has provided. Extract information like the time period from this.
         location (str, optional): Path to the activity data file. Defaults to "data/activities.json".
-    
+
     Returns:
         str: A filename containing the activities JSON.
     """
 
-    s = strava.StravaAPI(strava.get_access_token())
+    s = strava.StravaClient(strava.get_access_token())
     activities = s.fetch_activities()
     save_activities(activities, location)
     return location
 
+
 @tool(args_schema=SelectActivityInput)
 def select_activity(question: str, activities_file: str) -> str:
     """Identifies the activity best matching a user query from a list of activities.
-    
+
     The selection process considers fields such as the name, date, or other metadata of
     the activity.
-    
+
     Args:
         question (str): A natural language question or query from the user.
             Example: "Tell me about my longest run this week."
         activities_file (str): A file containing the JSON of activities.
-    
+
     Returns:
         str: A filename containing the relevant activity JSON.
 
     """
     with open(activities_file, "r") as f:
         activities = json.load(f)
-    
+
     # TODO: currently this code just selects the latest activity. I should write some custom
     # selection logic, so that if the user says "my run on date X" then it knows to filter only
     # runs and only activities on date X.
@@ -88,12 +93,12 @@ def select_activity(question: str, activities_file: str) -> str:
     with open(activity_file, "w") as f:
         json.dump(activity, f)
     return activity_file
-    
+
 
 @tool(args_schema=GetMapInformationInput)
 def enrich_activity(activity_file: str) -> str:
-    """Enriches a selected activity with map data. 
-    
+    """Enriches a selected activity with map data.
+
     Includes nearby landmarks and street names along the activity's route. This tool
     extracts information from the activity's polyline and location data.
 
@@ -103,9 +108,10 @@ def enrich_activity(activity_file: str) -> str:
     Returns:
         str: A filename containing the activity enriched with map information.
     """
+    g = gmaps.GMapsClient()
     with open(activity_file, "r") as f:
         activity = json.load(f)
-    return maps.fetch_map_details(activity["map"]["summary_polyline"])
+    return g.fetch_map_details(activity["map"]["summary_polyline"])
 
 
 tools = [

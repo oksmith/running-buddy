@@ -9,28 +9,27 @@ def get_access_token() -> str:
     with open("token_storage.json", "r") as f:
         return json.load(f)["access_token"]
 
-class StravaAPI:
+
+class StravaClient:
     def __init__(self, access_token: str):
         """
         Initializes the StravaAPI with the user's access token.
-        
+
         Args:
             access_token (str): The OAuth access token for the Strava API.
         """
         self.base_url = "https://www.strava.com/api/v3"
         self.access_token = access_token
-        self.headers = {
-            "Authorization": f"Bearer {self.access_token}"
-        }
+        self.headers = {"Authorization": f"Bearer {self.access_token}"}
 
     def fetch_activities(self, per_page: int = 30, page: int = 1) -> list:
         """
         Fetches a list of activities from the Strava API.
-        
+
         Args:
             per_page (int): The number of activities to fetch per page. Default is 30.
             page (int): The page number to fetch. Default is 1.
-        
+
         Returns:
             list: A list of activities in JSON format.
         """
@@ -46,11 +45,11 @@ class StravaAPI:
     # def update_activity(self, activity_id: int, description: str) -> dict:
     #     """
     #     Updates the description of an existing activity.
-        
+
     #     Args:
     #         activity_id (int): The ID of the activity to update.
     #         description (str): The new description for the activity.
-        
+
     #     Returns:
     #         dict: The updated activity details in JSON format.
     #     """

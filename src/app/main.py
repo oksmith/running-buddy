@@ -1,9 +1,10 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 
-from src.app.endpoints import ai, auth
+from src.app.api.routes import auth, chat
+# from src.app.api import ai
 
-app = FastAPI()
+app = FastAPI(title="Running Buddy AI Agent")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -23,9 +24,8 @@ async def read_root(request: Request):
     return HTMLResponse(content=html_content)
 
 
-@app.get("/agent", response_class=HTMLResponse)
+@app.get("/chat", response_class=HTMLResponse)
 async def agent_page(request: Request):
-    # TODO: read this from an asset file
     html_content = """
     <html>
         <head>
@@ -107,11 +107,77 @@ async def agent_page(request: Request):
                 </form>
             </div>
             <script>
+                // Add streaming support for the chat
+                let pendingConfirmation = null;
+
+                async function handleStream(message) {
+                    const response = await fetch('/chat/stream', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content: message })
+                    });
+
+                    if (!response.ok) {
+                        console.error("Failed to fetch chat stream:", response.statusText);
+                        const errorMessage = document.createElement('div');
+                        errorMessage.textContent = `System: Error fetching chat stream: ${response.statusText}`;
+                        errorMessage.className = 'system-message';
+                        chatHistory.appendChild(errorMessage);
+                        return;
+                    }
+
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        
+                        const chunk = JSON.parse(decoder.decode(value));
+                        
+                        if (chunk.type === 'confirmation_request') {
+                            // Show confirmation dialog
+                            pendingConfirmation = chunk.confirmation_id;
+                            const confirmed = confirm(chunk.message);
+                            
+                            // Send confirmation response
+                            const confirmResponse = await fetch('/chat/confirm', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    confirmation_id: pendingConfirmation,
+                                    confirmed: confirmed
+                                })
+                            });
+                            
+                            pendingConfirmation = null;
+                            
+                            // Handle the confirmation response
+                            if (confirmResponse.ok) {
+                                const result = await confirmResponse.json();
+                                // Add the result to chat history if needed
+                                const resultMessage = document.createElement('div');
+                                resultMessage.textContent = `System: ${result.message}`;
+                                resultMessage.className = 'system-message';
+                                chatHistory.appendChild(resultMessage);
+                            }
+                        } else {
+                            // Handle regular message chunks
+                            const messageDiv = document.createElement('div');
+                            messageDiv.textContent = `Agent: ${chunk.content}`;
+                            messageDiv.className = 'agent-message';
+                            chatHistory.appendChild(messageDiv);
+                        }
+                        
+                        chatHistory.scrollTop = chatHistory.scrollHeight;
+                    }
+                }
+
                 const form = document.getElementById('chat-form');
                 const chatHistory = document.getElementById('chat-history');
                 
                 form.addEventListener('submit', async (event) => {
-                    event.preventDefault(); // Prevent the default form submission
+                    event.preventDefault();
                     const message = document.getElementById('message').value;
 
                     // Add user's message to the chat history
@@ -123,36 +189,8 @@ async def agent_page(request: Request):
                     // Clear the input field
                     document.getElementById('message').value = '';
 
-                    // Scroll to the bottom of the chat history
-                    chatHistory.scrollTop = chatHistory.scrollHeight;
-
-                    // Send the message to the backend
-                    const response = await fetch('/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: message, chat_history: [] })
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-
-                        // Add the agent's response to the chat history
-                        const agentMessage = document.createElement('div');
-                        agentMessage.innerHTML = `Agent:<br>${data.response.replace(/\\n/g, '<br>')}`;
-                        agentMessage.className = 'agent-message';
-                        chatHistory.appendChild(agentMessage);
-
-                        // Scroll to the bottom of the chat history
-                        chatHistory.scrollTop = chatHistory.scrollHeight;
-                    } else {
-                        const errorMessage = document.createElement('div');
-                        errorMessage.textContent = 'Error: Could not process your request.';
-                        errorMessage.className = 'agent-message';
-                        chatHistory.appendChild(errorMessage);
-
-                        // Scroll to the bottom of the chat history
-                        chatHistory.scrollTop = chatHistory.scrollHeight;
-                    }
+                    // Handle the streaming response
+                    await handleStream(message);
                 });
 
             </script>
@@ -162,8 +200,13 @@ async def agent_page(request: Request):
     return HTMLResponse(content=html_content)
 
 
-app.include_router(auth.router)
-app.include_router(ai.router)
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(chat.router, prefix="/chat", tags=["chat"])
 
 if __name__ == "__main__":
     import uvicorn

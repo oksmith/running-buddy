@@ -40,55 +40,47 @@ async def format_stream_response(chunks: AsyncIterator) -> AsyncIterator[str]:
     """Format streaming chunks into SSE format."""
     try:
         async for chunk in chunks:
+            logging.debug(f"Raw chunk received: {chunk}")
+
             if isinstance(chunk, tuple):
-                stream_type, data = chunk
-                logging.debug(f"Received chunk: {stream_type}, {data}")
-                if stream_type == "messages" and data[0].content:
-                    yield f"data: {json.dumps({'type': 'message', 'content': data[0].content})}\n\n"
-                elif stream_type == "values" and data.get("ask_human", False):
-                    # Generate confirmation request
-                    confirmation_id = str(uuid4())
-                    event = asyncio.Event()
-                    confirmation_requests[confirmation_id] = event
+                chunk_type, chunk_data = chunk
+                logging.debug(
+                    f"Processing tuple chunk - type: {chunk_type}, data: {chunk_data}"
+                )
 
-                    yield f"""data: {
-                        json.dumps(
-                            {
-                                "type": "confirmation_request",
-                                "confirmation_id": confirmation_id,
-                                "message": "Do you want to proceed with this action?",
-                            }
+                if chunk_type == "messages":
+                    # If chunk_data is a tuple, get the first element (the message)
+                    message = (
+                        chunk_data[0] if isinstance(chunk_data, tuple) else chunk_data
+                    )
+
+                    # Check if it's an AIMessage with content
+                    if hasattr(message, "content") and message.content:
+                        yield (
+                            json.dumps({"type": "message", "content": message.content})
+                            + "\n"
                         )
-                    }\n\n"""
 
-                    try:
-                        # Wait for confirmation
-                        await asyncio.wait_for(
-                            event.wait(), timeout=300
-                        )  # 5 minute timeout
-                        response = confirmation_responses.get(confirmation_id, False)
-
-                        # Send confirmation result
-                        yield f"""data: {
+                elif chunk_type == "values":
+                    # Handle any special values if needed
+                    if isinstance(chunk_data, dict) and chunk_data.get("ask_human"):
+                        confirmation_id = str(uuid4())
+                        yield (
                             json.dumps(
-                                {"type": "confirmation_result", "confirmed": response}
+                                {
+                                    "type": "confirmation_request",
+                                    "confirmation_id": confirmation_id,
+                                    "message": "Do you want to proceed with this action?",
+                                }
                             )
-                        }\n\n"""
+                            + "\n"
+                        )
 
-                    except asyncio.TimeoutError:
-                        yield f"""data: {
-                            json.dumps(
-                                {"type": "error", "content": "Confirmation timeout"}
-                            )
-                        }\n\n"""
-                    finally:
-                        confirmation_requests.pop(confirmation_id, None)
-                        confirmation_responses.pop(confirmation_id, None)
     except Exception as e:
         logging.error(f"Error in streaming: {str(e)}")
-        yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+        yield json.dumps({"type": "error", "content": str(e)}) + "\n"
     finally:
-        yield f"data: {json.dumps({'type': 'done', 'done': True})}\n\n"
+        yield json.dumps({"type": "done"}) + "\n"
 
 
 @router.post("/stream")
@@ -100,7 +92,7 @@ async def send_message_stream(
         graph = get_chat_graph(current_user.id)
         chunks = graph.process_message_stream(message.content)
         return StreamingResponse(
-            format_stream_response(chunks), media_type="text/event-stream"
+            format_stream_response(chunks), media_type="application/json"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

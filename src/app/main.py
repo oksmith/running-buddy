@@ -24,7 +24,7 @@ async def read_root(request: Request):
     return HTMLResponse(content=html_content)
 
 
-@app.get("/chat", response_class=HTMLResponse)
+@app.get("/chat-ui", response_class=HTMLResponse)
 async def agent_page(request: Request):
     html_content = """
     <html>
@@ -100,30 +100,43 @@ async def agent_page(request: Request):
             <div id="chat-box">
                 <h1 style="text-align: center;">Running Buddy</h1>
                 <div id="chat-history"></div>
-                <form id="chat-form">
+                <form id="chat-form" action="javascript:void(0);">
                     <label for="message">Your message:</label>
                     <input type="text" id="message" name="message" placeholder="Type your message here">
                     <input type="submit" value="Send">
                 </form>
             </div>
             <script>
-                // Add streaming support for the chat
-                let pendingConfirmation = null;
+            const form = document.getElementById('chat-form');
+            const chatHistory = document.getElementById('chat-history');
+            
+            form.onsubmit = async function(event) {
+                event.preventDefault();
+                
+                const messageInput = document.getElementById('message');
+                const message = messageInput.value;
+                console.log("Sending message:", message);
 
-                async function handleStream(message) {
+                // Add user message
+                const userMessage = document.createElement('div');
+                userMessage.textContent = `You: ${message}`;
+                userMessage.className = 'user-message';
+                chatHistory.appendChild(userMessage);
+
+                // Clear input
+                messageInput.value = '';
+
+                try {
                     const response = await fetch('/chat/stream', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json'
+                        },
                         body: JSON.stringify({ content: message })
                     });
 
                     if (!response.ok) {
-                        console.error("Failed to fetch chat stream:", response.statusText);
-                        const errorMessage = document.createElement('div');
-                        errorMessage.textContent = `System: Error fetching chat stream: ${response.statusText}`;
-                        errorMessage.className = 'system-message';
-                        chatHistory.appendChild(errorMessage);
-                        return;
+                        throw new Error(`HTTP error! status: ${response.status}`);
                     }
 
                     const reader = response.body.getReader();
@@ -133,66 +146,38 @@ async def agent_page(request: Request):
                         const { value, done } = await reader.read();
                         if (done) break;
                         
-                        const chunk = JSON.parse(decoder.decode(value));
+                        const text = decoder.decode(value);
+                        console.log("Received text:", text);
                         
-                        if (chunk.type === 'confirmation_request') {
-                            // Show confirmation dialog
-                            pendingConfirmation = chunk.confirmation_id;
-                            const confirmed = confirm(chunk.message);
+                        text.split('\\n').forEach(line => {
+                            if (!line.trim()) return;
                             
-                            // Send confirmation response
-                            const confirmResponse = await fetch('/chat/confirm', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    confirmation_id: pendingConfirmation,
-                                    confirmed: confirmed
-                                })
-                            });
-                            
-                            pendingConfirmation = null;
-                            
-                            // Handle the confirmation response
-                            if (confirmResponse.ok) {
-                                const result = await confirmResponse.json();
-                                // Add the result to chat history if needed
-                                const resultMessage = document.createElement('div');
-                                resultMessage.textContent = `System: ${result.message}`;
-                                resultMessage.className = 'system-message';
-                                chatHistory.appendChild(resultMessage);
+                            try {
+                                const chunk = JSON.parse(line);
+                                console.log("Parsed chunk:", chunk);
+                                
+                                if (chunk.type === 'message' && chunk.content) {
+                                    const messageDiv = document.createElement('div');
+                                    messageDiv.textContent = `Agent: ${chunk.content}`;
+                                    messageDiv.className = 'agent-message';
+                                    chatHistory.appendChild(messageDiv);
+                                    chatHistory.scrollTop = chatHistory.scrollHeight;
+                                }
+                            } catch (e) {
+                                console.error('Failed to parse line:', line, e);
                             }
-                        } else {
-                            // Handle regular message chunks
-                            const messageDiv = document.createElement('div');
-                            messageDiv.textContent = `Agent: ${chunk.content}`;
-                            messageDiv.className = 'agent-message';
-                            chatHistory.appendChild(messageDiv);
-                        }
-                        
-                        chatHistory.scrollTop = chatHistory.scrollHeight;
+                        });
                     }
+                } catch (error) {
+                    console.error("Error:", error);
+                    const errorDiv = document.createElement('div');
+                    errorDiv.textContent = `Error: ${error.message}`;
+                    errorDiv.className = 'system-message';
+                    chatHistory.appendChild(errorDiv);
                 }
-
-                const form = document.getElementById('chat-form');
-                const chatHistory = document.getElementById('chat-history');
                 
-                form.addEventListener('submit', async (event) => {
-                    event.preventDefault();
-                    const message = document.getElementById('message').value;
-
-                    // Add user's message to the chat history
-                    const userMessage = document.createElement('div');
-                    userMessage.textContent = `You: ${message}`;
-                    userMessage.className = 'user-message';
-                    chatHistory.appendChild(userMessage);
-
-                    // Clear the input field
-                    document.getElementById('message').value = '';
-
-                    // Handle the streaming response
-                    await handleStream(message);
-                });
-
+                return false;
+            };
             </script>
         </body>
     </html>

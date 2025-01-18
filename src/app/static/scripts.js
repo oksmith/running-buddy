@@ -108,7 +108,7 @@ form.onsubmit = async function(event) {
             
             const parsedResponse = JSON.parse(text);
             console.log("Parsed response:", parsedResponse);
-            
+
             if (parsedResponse.message) {
                 currentText += parsedResponse.message;
                 agentMessage.textContent = `Agent: ${currentText}`;
@@ -118,6 +118,7 @@ form.onsubmit = async function(event) {
                 handleConfirmation(parsedResponse.confirmation_id);
             }
             
+
             chatHistory.scrollTop = chatHistory.scrollHeight;
         }
     } catch (error) {

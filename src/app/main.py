@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 
 from src.app.api.routes import auth, chat
+
 # from src.app.api import ai
 
 app = FastAPI(title="Running Buddy AI Agent")
@@ -42,7 +43,8 @@ async def agent_page(request: Request):
                     height: 100vh;
                 }
                 #chat-box {
-                    width: 400px;
+                    width: 800px;
+                    max-width: 90vw;
                     border: 2px solid #ccc;
                     border-radius: 8px;
                     padding: 16px;
@@ -50,7 +52,7 @@ async def agent_page(request: Request):
                     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
                 }
                 #chat-history {
-                    height: 300px;
+                    height: 600px;
                     overflow-y: auto;
                     border: 1px solid #ddd;
                     padding: 8px;
@@ -142,6 +144,15 @@ async def agent_page(request: Request):
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
 
+                    // Create a single message div for the agent's response
+                    const agentMessage = document.createElement('div');
+                    agentMessage.className = 'agent-message';
+                    agentMessage.style.whiteSpace = 'pre-wrap';
+                    agentMessage.textContent = 'Agent: ';
+                    chatHistory.appendChild(agentMessage);
+
+                    let currentText = '';
+
                     while (true) {
                         const { value, done } = await reader.read();
                         if (done) break;
@@ -157,11 +168,11 @@ async def agent_page(request: Request):
                                 console.log("Parsed chunk:", chunk);
                                 
                                 if (chunk.type === 'message' && chunk.content) {
-                                    const messageDiv = document.createElement('div');
-                                    messageDiv.textContent = `Agent: ${chunk.content}`;
-                                    messageDiv.className = 'agent-message';
-                                    chatHistory.appendChild(messageDiv);
-                                    chatHistory.scrollTop = chatHistory.scrollHeight;
+                                    if (!chunk.tool_call_id) {
+                                        currentText += chunk.content;
+                                        agentMessage.textContent = `Agent: ${currentText}`;
+                                        chatHistory.scrollTop = chatHistory.scrollHeight;
+                                    }
                                 }
                             } catch (e) {
                                 console.error('Failed to parse line:', line, e);

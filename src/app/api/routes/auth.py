@@ -1,12 +1,13 @@
+import json
+import os
+from typing import Dict
+from urllib.parse import urlencode
+
+import requests
+from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
-from typing import Dict
-import requests
-import os
-import json
-from urllib.parse import urlencode
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -14,7 +15,7 @@ APP_CLIENT_ID = os.getenv("APP_CLIENT_ID")
 APP_CLIENT_SECRET = os.getenv("APP_CLIENT_SECRET")
 REDIRECT_URI = "http://localhost:8000/auth/exchange-token"
 GET_AUTH_URL_NAME = "get_auth_url"
-CHAT_PAGE = "/chat"
+CHAT_PAGE = "/chat-ui"
 
 router = APIRouter()
 

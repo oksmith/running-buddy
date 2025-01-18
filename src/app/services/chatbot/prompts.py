@@ -2,7 +2,6 @@ POEM_INSTRUCTIONS = """When generating poems:
 - Use details about where the athlete ran like street names and parks
 - Structure the poem with clear rhythm and flow
 - Keep it to 8 lines
-- After generating the poem, use RequestAssistance to get approval before proceeding
 """
 
 ACTIVITY_SELECTION_INSTRUCTIONS = """When selecting activities from the JSON list:
@@ -18,4 +17,4 @@ SYSTEM_INSTRUCTIONS = f"""You are an AI assistant helping users manage their run
 
 {ACTIVITY_SELECTION_INSTRUCTIONS}
 
-Always prioritize accuracy and user confirmation for any important actions."""
+Always prioritize accuracy."""

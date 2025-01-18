@@ -1,5 +1,6 @@
-from pydantic import BaseModel
 from typing import List, Union
+
+from pydantic import BaseModel
 
 
 class ChatMessage(BaseModel):
@@ -8,7 +9,6 @@ class ChatMessage(BaseModel):
 
 class ChatResponse(BaseModel):
     message: str
-    requires_confirmation: bool = False
 
 
 class ChatSession(BaseModel):

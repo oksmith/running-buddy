@@ -1,6 +1,7 @@
 import json
 
 import requests
+
 # from src.app.core.exceptions import StravaAPIException # TODO: write a better StravaAPIException?
 
 
@@ -42,7 +43,7 @@ class StravaClient:
         except requests.exceptions.RequestException as e:
             raise Exception(f"Failed to fetch activities: {str(e)}")
 
-    async def update_activity(self, activity_id: int, description: str) -> dict:
+    def update_activity(self, activity_id: int, description: str) -> dict:
         """
         Updates the description of an existing activity.
 

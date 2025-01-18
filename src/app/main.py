@@ -96,6 +96,31 @@ async def agent_page(request: Request):
                 #chat-form input[type="submit"]:hover {
                     background-color: #45a049;
                 }
+                .confirmation-dialog {
+                    background-color: #fff3cd;
+                    border: 1px solid #ffeeba;
+                    padding: 15px;
+                    margin: 10px 0;
+                    border-radius: 4px;
+                }
+                .confirmation-buttons {
+                    margin-top: 10px;
+                }
+                .confirm-btn, .cancel-btn {
+                    padding: 5px 15px;
+                    margin-right: 10px;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                }
+                .confirm-btn {
+                    background-color: #28a745;
+                    color: white;
+                }
+                .cancel-btn {
+                    background-color: #dc3545;
+                    color: white;
+                }
             </style>
         </head>
         <body>
@@ -111,6 +136,47 @@ async def agent_page(request: Request):
             <script>
             const form = document.getElementById('chat-form');
             const chatHistory = document.getElementById('chat-history');
+
+            // Handle human confirmation button
+            async function handleConfirmation(confirmationId) {
+                const confirmationDiv = document.createElement('div');
+                confirmationDiv.className = 'confirmation-dialog';
+                confirmationDiv.innerHTML = `
+                    <p>Do you want to proceed with this action?</p>
+                    <div class="confirmation-buttons">
+                        <button class="confirm-btn" onclick="sendConfirmation('${confirmationId}', true)">Yes</button>
+                        <button class="cancel-btn" onclick="sendConfirmation('${confirmationId}', false)">No</button>
+                    </div>
+                `;
+                chatHistory.appendChild(confirmationDiv);
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+
+            async function sendConfirmation(confirmationId, confirmed) {
+                try {
+                    const response = await fetch('/chat/confirm', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            confirmation_id: confirmationId,
+                            confirmed: confirmed
+                        })
+                    });
+                    
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    
+                    // Remove the confirmation dialog
+                    const dialogs = document.querySelectorAll('.confirmation-dialog');
+                    dialogs.forEach(dialog => dialog.remove());
+                    
+                } catch (error) {
+                    console.error("Error sending confirmation:", error);
+                }
+            }
+
+
             
             form.onsubmit = async function(event) {
                 event.preventDefault();
@@ -171,9 +237,12 @@ async def agent_page(request: Request):
                                     if (!chunk.tool_call_id) {
                                         currentText += chunk.content;
                                         agentMessage.textContent = `Agent: ${currentText}`;
-                                        chatHistory.scrollTop = chatHistory.scrollHeight;
                                     }
+                                } else if (chunk.type == 'confirmation_request') {
+                                    handleConfirmation(chunk.confirmation_id);
                                 }
+
+                                chatHistory.scrollTop = chatHistory.scrollHeight;
                             } catch (e) {
                                 console.error('Failed to parse line:', line, e);
                             }

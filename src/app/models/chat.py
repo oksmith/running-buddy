@@ -9,6 +9,7 @@ class ChatMessage(BaseModel):
 
 class ChatResponse(BaseModel):
     message: str
+    requires_confirmation: bool
 
 
 class ChatSession(BaseModel):

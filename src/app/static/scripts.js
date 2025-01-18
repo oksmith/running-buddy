@@ -1,6 +1,63 @@
+// Handle human confirmation button
+async function handleConfirmation(confirmationId) {
+    const confirmationDiv = document.createElement('div');
+    confirmationDiv.className = 'confirmation-dialog';
+    confirmationDiv.innerHTML = `
+        <p>Do you want to proceed with this action?</p>
+        <div class="confirmation-buttons">
+            <button class="confirm-btn">Yes</button>
+            <button class="cancel-btn">No</button>
+        </div>
+    `;
+    chatHistory.appendChild(confirmationDiv);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+    // Add event listeners
+    
+    confirmationDiv.querySelector('.confirm-btn').addEventListener('click', () => {
+        console.log('Confirm button clicked');
+        sendConfirmation(confirmationId, true);
+    });
+    confirmationDiv.querySelector('.cancel-btn').addEventListener('click', () => {
+        console.log('Cancel button clicked');
+        sendConfirmation(confirmationId, false);
+    });
+}
+
+// Send human confirmation message
+async function sendConfirmation(confirmationId, confirmed) {
+    try {
+        const response = await fetch('/chat/confirm', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                confirmation_id: confirmationId,
+                confirmed: confirmed
+            })
+        });
+        
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        // Remove the confirmation dialog
+        const dialogs = document.querySelectorAll('.confirmation-dialog');
+        dialogs.forEach(dialog => dialog.remove());
+        // Now, send back the confirmation value to the graph
+        // response : {"status": "success", "message": "Confirmation received"}
+        
+    } catch (error) {
+        console.error("Error sending confirmation:", error);
+        // Display an error message to the user
+        const errorDiv = document.createElement('div');
+        errorDiv.textContent = `Error: ${error.message}`;
+        errorDiv.className = 'system-message';
+        chatHistory.appendChild(errorDiv);
+    }
+}
+
+// Form submission
 const form = document.getElementById('chat-form');
 const chatHistory = document.getElementById('chat-history');
-
 form.onsubmit = async function(event) {
     event.preventDefault();
     
@@ -18,7 +75,7 @@ form.onsubmit = async function(event) {
     messageInput.value = '';
 
     try {
-        const response = await fetch('/chat/stream', {
+        const response = await fetch('/chat/message', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json'
@@ -49,26 +106,19 @@ form.onsubmit = async function(event) {
             const text = decoder.decode(value);
             console.log("Received text:", text);
             
-            text.split('\n').forEach(line => {
-                if (!line.trim()) return;
-                
-                try {
-                    console.log(line)
-                    const chunk = JSON.parse(line);
-                    console.log("Parsed chunk:", chunk);
-                    
-                    if (chunk.type === 'message' && chunk.content) {
-                        if (!chunk.tool_call_id) {
-                            currentText += chunk.content;
-                            agentMessage.textContent = `Agent: ${currentText}`;
-                        }
-                    }
-
-                    chatHistory.scrollTop = chatHistory.scrollHeight;
-                } catch (e) {
-                    console.error('Failed to parse line:', line, e);
-                }
-            });
+            const parsedResponse = JSON.parse(text);
+            console.log("Parsed response:", parsedResponse);
+            
+            if (parsedResponse.message) {
+                currentText += parsedResponse.message;
+                agentMessage.textContent = `Agent: ${currentText}`;
+            }
+            
+            if (parsedResponse.requires_confirmation) {
+                handleConfirmation(parsedResponse.confirmation_id);
+            }
+            
+            chatHistory.scrollTop = chatHistory.scrollHeight;
         }
     } catch (error) {
         console.error("Error:", error);

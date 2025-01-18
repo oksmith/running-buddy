@@ -49,10 +49,11 @@ form.onsubmit = async function(event) {
             const text = decoder.decode(value);
             console.log("Received text:", text);
             
-            text.split('\\n').forEach(line => {
+            text.split('\n').forEach(line => {
                 if (!line.trim()) return;
                 
                 try {
+                    console.log(line)
                     const chunk = JSON.parse(line);
                     console.log("Parsed chunk:", chunk);
                     

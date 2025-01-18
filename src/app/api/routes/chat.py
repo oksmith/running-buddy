@@ -1,7 +1,6 @@
-import asyncio
 import json
 import logging
-from typing import AsyncIterator, Dict
+from typing import AsyncIterator
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,15 +10,14 @@ from pydantic import BaseModel
 
 from src.app.models.chat import ChatMessage, ChatResponse
 from src.app.services.chatbot.graph import get_chat_graph
+from src.app.services.chatbot.human_confirmation import (
+    CONFIRMATION_REQUESTS,
+    CONFIRMATION_RESPONSES,
+)
 
 logging.basicConfig(level=logging.DEBUG)
 
 router = APIRouter()
-
-# Store pending confirmations
-confirmation_requests: Dict[str, asyncio.Event] = {}
-confirmation_responses: Dict[str, bool] = {}
-
 
 class User(BaseModel):
     id: str
@@ -150,8 +148,13 @@ async def confirm_action(
     request: ConfirmationRequest, current_user=Depends(get_current_user)
 ):
     """Handle user confirmation for actions that require it."""
-    if request.confirmation_id in confirmation_requests:
-        confirmation_responses[request.confirmation_id] = request.confirmed
-        confirmation_requests[request.confirmation_id].set()
+    logging.info(f"Received confirmation: {request.confirmation_id}, confirmed: {request.confirmed}")
+    logging.info(f"Pending confirmations: {CONFIRMATION_REQUESTS.keys()}")
+    logging.info(f"Pending confirmations: {CONFIRMATION_RESPONSES.keys()}")
+
+    if request.confirmation_id in CONFIRMATION_REQUESTS:
+        CONFIRMATION_RESPONSES[request.confirmation_id] = request.confirmed
+        CONFIRMATION_REQUESTS[request.confirmation_id].set()
+        del CONFIRMATION_REQUESTS[request.confirmation_id]
         return {"status": "success", "message": "Confirmation received"}
     return {"status": "error", "message": "No pending confirmation found"}

@@ -144,12 +144,23 @@ async def agent_page(request: Request):
                 confirmationDiv.innerHTML = `
                     <p>Do you want to proceed with this action?</p>
                     <div class="confirmation-buttons">
-                        <button class="confirm-btn" onclick="sendConfirmation('${confirmationId}', true)">Yes</button>
-                        <button class="cancel-btn" onclick="sendConfirmation('${confirmationId}', false)">No</button>
+                        <button class="confirm-btn">Yes</button>
+                        <button class="cancel-btn">No</button>
                     </div>
                 `;
                 chatHistory.appendChild(confirmationDiv);
                 chatHistory.scrollTop = chatHistory.scrollHeight;
+
+                // Add event listeners
+                
+                confirmationDiv.querySelector('.confirm-btn').addEventListener('click', () => {
+                    console.log('Confirm button clicked');
+                    sendConfirmation(confirmationId, true);
+                });
+                confirmationDiv.querySelector('.cancel-btn').addEventListener('click', () => {
+                    console.log('Cancel button clicked');
+                    sendConfirmation(confirmationId, false);
+                });
             }
 
             async function sendConfirmation(confirmationId, confirmed) {
@@ -170,9 +181,19 @@ async def agent_page(request: Request):
                     // Remove the confirmation dialog
                     const dialogs = document.querySelectorAll('.confirmation-dialog');
                     dialogs.forEach(dialog => dialog.remove());
+
+                    // Now, send back the confirmation value to the graph
+                    // response : {"status": "success", "message": "Confirmation received"}
+
                     
                 } catch (error) {
                     console.error("Error sending confirmation:", error);
+
+                    // Display an error message to the user
+                    const errorDiv = document.createElement('div');
+                    errorDiv.textContent = `Error: ${error.message}`;
+                    errorDiv.className = 'system-message';
+                    chatHistory.appendChild(errorDiv);
                 }
             }
 

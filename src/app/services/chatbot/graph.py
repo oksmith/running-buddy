@@ -1,19 +1,23 @@
-from typing import Dict, AsyncIterator
+import logging
+from typing import AsyncIterator, Dict
+
 from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph
-from langgraph.prebuilt import (
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import (  # TODO: check what tools_condition and ToolNode do again?
     ToolNode,
     tools_condition,
-)  # TODO: check what tools_condition and ToolNode do again?
-from langgraph.checkpoint.memory import MemorySaver
-from typing_extensions import TypedDict, Annotated
+)
 from pydantic import BaseModel
+from typing_extensions import Annotated, TypedDict
 
-from src.app.services.chatbot.tools import get_tools
+from src.app.services.chatbot.human_confirmation import get_user_confirmation_async
 from src.app.services.chatbot.prompts import SYSTEM_INSTRUCTIONS
-from langgraph.graph.message import add_messages
+from src.app.services.chatbot.tools import get_tools
 
+logging.basicConfig(level=logging.DEBUG)
 
 MODEL_NAME = "gpt-4o-mini"
 
@@ -59,12 +63,16 @@ class ChatGraph:
         try:
             response = self.llm_with_tools.invoke(messages)
 
+            logging.debug(f"Tool calls in _chatbot_node: {response.tool_calls}")
+
             ask_human = False
             if (
                 response.tool_calls
                 and response.tool_calls[0]["name"] == RequestAssistance.__name__
             ):
                 ask_human = True
+
+            logging.debug(f"ask_human: {ask_human}")
 
             return {"messages": [response], "ask_human": ask_human}
 
@@ -79,6 +87,7 @@ class ChatGraph:
         """
         new_messages = []
         ai_message = state["messages"][-1]
+        logging.debug("CALLING _human_node!")
 
         # Check if this is a RequestAssistance tool call
         if (
@@ -88,9 +97,13 @@ class ChatGraph:
             and len(ai_message.tool_calls) > 0
         ):
             tool_call = ai_message.tool_calls[0]
-            # Note: In FastAPI context, this will be handled by the API endpoint
-            # The confirmation will come from the client
-            user_confirmation = self._get_user_confirmation()
+            confirmation_id = tool_call["id"]
+
+            logging.warning(f'Waiting for human confirmation with ID: {confirmation_id}, MESSAGES: {state["messages"]}')
+
+            # TODO: how do I get the button click information from the UI back into
+            # this message / graph state?
+            user_confirmation = get_user_confirmation_async(confirmation_id)
 
             new_messages.append(
                 ToolMessage(
@@ -110,16 +123,18 @@ class ChatGraph:
                         else "default_id",
                     )
                 )
-
+        
         return {
-            "messages": new_messages,
-            "ask_human": False,
+            "messages": state["messages"] + new_messages,
+            "ask_human": False,  # Human input is resolved, loop back to the chatbot
         }
+
 
     def _select_next_node(self, state: State) -> str:
         """
         Determine the next node in the graph.
         """
+        logging.debug(f"_select_next_node is on state {state}!")
         if state["ask_human"]:
             return "human"
         return tools_condition(state)
@@ -152,14 +167,6 @@ class ChatGraph:
             checkpointer=memory,
             interrupt_before=["human"],
         )
-
-    def _get_user_confirmation(self) -> bool:
-        """
-        Placeholder for getting user confirmation.
-        In FastAPI context, this will be replaced by API endpoint handling.
-        """
-        # TODO: hook this up to the API to get confirmation from the user
-        return False
 
     async def process_message_stream(self, message: str) -> AsyncIterator[Dict]:
         """

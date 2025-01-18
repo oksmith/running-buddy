@@ -25,84 +25,6 @@ def get_current_user() -> User:
     return User(id="test-user-1")
 
 
-async def format_stream_response(chunks: AsyncIterator) -> AsyncIterator[str]:
-    """Format streaming chunks into SSE format."""
-    try:
-        async for chunk in chunks:
-            # logging.debug(f"Raw chunk received: {chunk}")
-
-            if isinstance(chunk, tuple):
-                chunk_type, chunk_data = chunk
-                # if chunk_type == "values":
-                logging.debug(
-                    f"Processing values chunk - type: {chunk_type}, data: {chunk_data}"
-                )
-
-                # `messages` chunks are received while we stream AI messages from the graph.
-                # only the latest token will be provided in such a message. It could also
-                # be a ToolMessage content being returned to the chatbot.
-                if chunk_type == "messages":
-                    # chunk_data is a tuple of (message: AIMessageChunk, metadata: Dict)
-                    # we take the message if it's a tuple
-                    if not isinstance(chunk_data, tuple):
-                        raise ValueError(f"Expected chunk_data to be a tuple: {chunk_data}")
-                    
-                    # extract the message
-                    message = chunk_data[0]
-                    metadata = chunk_data[1]
-                    if metadata["langgraph_node"] == "tools":
-                        # Sometimes a tool involves invoking a secondary LLM, don't send a message to the UI
-                        # about these.
-                        continue
-
-                    if hasattr(message, "content") and message.content:
-                        # Check if it's an AIMessage (streamed) content, or a ToolMessage result
-                        if isinstance(message, AIMessage):
-                            logging.warning(f"AIMessage: {message}")
-                            yield (
-                                json.dumps({"type": "message", "content": message.content})
-                                + "\n"
-                            )
-                        elif isinstance(message, ToolMessage):
-                            logging.warning(f"ToolMessage: {message}")
-                            if hasattr(message, "tool_call_id"):
-                                yield (
-                                    json.dumps({"type": "message", "content": message.content, "tool_call_id": message.tool_call_id})
-                                    + "\n"
-                                )
-                            else:
-                                raise ValueError(f"Received ToolMessage without a tool_call_id: {message}")
-
-                # `values` chunk contains the entire state of the graph, all complete 
-                # messages. We should look at the latest message to figure out what to
-                # send to the UI
-                elif chunk_type == "values":
-                    pass
-                    # Note: We don't need to handle AI messages from `values` since that's already been streamed
-                    # as messages above! If we send a message now it will be duplicated.
-
-    except Exception as e:
-        logging.error(f"Error in streaming: {str(e)}")
-        yield json.dumps({"type": "error", "content": str(e)}) + "\n"
-    finally:
-        yield json.dumps({"type": "done"}) + "\n"
-
-
-@router.post("/stream")
-async def send_message_stream(
-    message: ChatMessage, current_user=Depends(get_current_user)
-):
-    """Stream the chat response using Server-Sent Events (SSE)."""
-    try:
-        graph = get_chat_graph(current_user.id)
-        chunks = graph.process_message_stream(message.content)
-        return StreamingResponse(
-            format_stream_response(chunks), media_type="application/json"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.post("/message", response_model=ChatResponse)
 async def send_message(message: ChatMessage, current_user=Depends(get_current_user)):
     """Non-streaming version of the message endpoint."""
@@ -111,10 +33,23 @@ async def send_message(message: ChatMessage, current_user=Depends(get_current_us
         final_message = ""
 
         async for chunk in graph.process_message_stream(message.content):
-            if isinstance(chunk, tuple):
-                stream_type, data = chunk
-                if stream_type == "messages":
-                    final_message += data[0].content
+            if not isinstance(chunk, tuple):
+                logging.error(f"Unexpected chunk format: {chunk}")
+                continue
+
+            try:
+                chunk_type, chunk_data = chunk
+
+                if chunk_type == "messages":
+                    if chunk_data and isinstance(chunk_data, list):
+                        final_message += chunk_data[0].content
+                elif chunk_type == "values":
+                    logging.debug(f"Processing chunk - type: {chunk_type}, data: {chunk_data}")
+                    last_message = chunk_data["messages"][-1]
+                    final_message = last_message.content
+                    requires_confirmation = getattr(chunk_data, "ask_human", False)
+            except Exception as e:
+                logging.error(f"Error processing chunk: {chunk}, error: {e}")
 
         return ChatResponse(
             message=final_message

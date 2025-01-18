@@ -18,7 +18,7 @@ form.onsubmit = async function(event) {
     messageInput.value = '';
 
     try {
-        const response = await fetch('/chat/stream', {
+        const response = await fetch('/chat/message', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json'
@@ -49,26 +49,19 @@ form.onsubmit = async function(event) {
             const text = decoder.decode(value);
             console.log("Received text:", text);
             
-            text.split('\n').forEach(line => {
-                if (!line.trim()) return;
-                
-                try {
-                    console.log(line)
-                    const chunk = JSON.parse(line);
-                    console.log("Parsed chunk:", chunk);
-                    
-                    if (chunk.type === 'message' && chunk.content) {
-                        if (!chunk.tool_call_id) {
-                            currentText += chunk.content;
-                            agentMessage.textContent = `Agent: ${currentText}`;
-                        }
-                    }
+            const parsedResponse = JSON.parse(text);
+            console.log("Parsed response:", parsedResponse);
 
-                    chatHistory.scrollTop = chatHistory.scrollHeight;
-                } catch (e) {
-                    console.error('Failed to parse line:', line, e);
-                }
-            });
+            if (parsedResponse.message) {
+                currentText += parsedResponse.message;
+                agentMessage.textContent = `Agent: ${currentText}`;
+            }
+
+            if (parsedResponse.requires_confirmation) {
+                handleConfirmation(parsedResponse.confirmation_id);
+            }
+
+            chatHistory.scrollTop = chatHistory.scrollHeight;
         }
     } catch (error) {
         console.error("Error:", error);

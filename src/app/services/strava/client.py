@@ -1,8 +1,7 @@
 import json
+from datetime import datetime, timedelta
 
 import requests
-
-# from src.app.core.exceptions import StravaAPIException # TODO: write a better StravaAPIException?
 
 
 # TODO: improve user token storage. Also make it so that it handles multiple
@@ -21,11 +20,12 @@ class StravaClient:
             "Content-Type": "application/json",
         }
 
-    def fetch_activities(self, per_page: int = 30, page: int = 1) -> list:
+    def fetch_activities(self, days_ago: int = 7, per_page: int = 30, page: int = 1) -> list:
         """
         Fetches a list of activities from the Strava API.
 
         Args:
+            days_ago (int): The number of days back to look when fetching activities. Default is 7.
             per_page (int): The number of activities to fetch per page. Default is 30.
             page (int): The page number to fetch. Default is 1.
 
@@ -33,10 +33,13 @@ class StravaClient:
             list: A list of activities in JSON format.
         """
         try:
+            time_range = datetime.now() - timedelta(days=days_ago)
+            after = int(time_range.timestamp())
+
             response = requests.get(
                 f"{self.base_url}/athlete/activities",
                 headers=self.headers,
-                params={"per_page": per_page, "page": page},
+                params={"per_page": per_page, "page": page, "after": after},
             )
             response.raise_for_status()
             return response.json()

@@ -1,6 +1,9 @@
+import json
+from typing import Tuple
+
+from src.app.services.chatbot import utils
 from src.app.services.googlemaps.client import GMapsClient
 from src.app.services.strava.client import StravaClient, get_access_token
-import json
 
 
 def fetch_activities(query: str) -> str:
@@ -20,7 +23,7 @@ def fetch_activities(query: str) -> str:
     return location
 
 
-def select_activity(query: str, activities_file: str) -> str:
+def select_activity(query: str, activities_file: str) -> Tuple[bool, str]:
     """Identifies the activity best matching a user query from a list of activities.
 
     The selection process considers fields such as the name, date, or other metadata of
@@ -31,22 +34,30 @@ def select_activity(query: str, activities_file: str) -> str:
         activities_file (str): The filename containing activities data.
 
     Returns:
+        bool: A boolean indicating whether we could find a matching activity or not. If False then the latest activity will be selected.
         str: A filename containing the relevant activity JSON.
 
     """
     with open(activities_file, "r") as f:
         activities = json.load(f)
 
-    # TODO: currently this code just selects the latest activity. I should write some custom
-    # selection logic, so that if the user says "my run on date X" then it knows to filter only
-    # runs and only activities on date X.
-    activity = activities[-1]
-
-    # Save selected activity
     activity_file = "data/selected_activity.json"
-    with open(activity_file, "w") as f:
-        json.dump(activity, f)
-    return activity_file
+
+    try:
+        activity = utils.select_activity_llm(
+            query, activities
+        )
+        found_activity = True
+        with open(activity_file, "w") as f:
+            json.dump(activity, f)
+    except Exception:
+        # default to the latest activity
+        activity = activities[-1]
+        found_activity = False
+        with open(activity_file, "w") as f:
+            json.dump(activity, f)
+
+    return found_activity, activity_file
 
 
 def read_activity(activity_file: str) -> str:
@@ -83,9 +94,6 @@ def enrich_activity(activity_file: str) -> str:
 
 def update_activity(activity_file: str, new_description: str) -> str:
     """Updates the description of a selected activity using the Strava API.
-
-    Always check with the expert before running this function. Display the activity
-    name and timestamp, and ask them to confirm with a (y) or (n).
 
     Args:
         activity_file (str): A file containing activity data.

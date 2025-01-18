@@ -24,6 +24,14 @@ def get_current_user() -> User:
     """
     return User(id="test-user-1")
 
+    """
+    
+    type: messages, data: (AIMessageChunk(content=' on', additional_kwargs={}, response_metadata={}, id='run-c020732f-dcb2-4710-85e0-76ad244959ef'), {'thread_id': '1', 'langgraph_step': 17, 'langgraph_node': 'chatbot', 'langgraph_triggers': ['tools'], 'langgraph_path': ('__pregel_pull', 'chatbot'), 'langgraph_checkpoint_ns': 'chatbot:979e9a52-83f9-8e8f-cfbc-af494f6d782c', 'checkpoint_ns': 'chatbot:979e9a52-83f9-8e8f-cfbc-af494f6d782c', 'ls_provider': 'openai', 'ls_model_name': 'gpt-4o-mini', 'ls_model_type': 'chat', 'ls_temperature': None})
+    
+    type: messages, data: (AIMessageChunk(content='EQ', additional_kwargs={}, response_metadata={}, id='run-d3151d00-c761-414f-b969-fc397dfeedaa'), {'thread_id': '1', 'langgraph_step': 16, 'langgraph_node': 'tools', 'langgraph_triggers': ['branch:chatbot:_select_next_node:tools'], 'langgraph_path': ('__pregel_pull', 'tools'), 'langgraph_checkpoint_ns': 'tools:d6885dde-0344-eb36-1696-5cb9b3e206ca', 'checkpoint_ns': 'tools:d6885dde-0344-eb36-1696-5cb9b3e206ca', 'ls_provider': 'openai', 'ls_model_name': 'gpt-4o-mini', 'ls_model_type': 'chat', 'ls_temperature': None})
+    """
+
+
 
 async def format_stream_response(chunks: AsyncIterator) -> AsyncIterator[str]:
     """Format streaming chunks into SSE format."""
@@ -49,6 +57,11 @@ async def format_stream_response(chunks: AsyncIterator) -> AsyncIterator[str]:
                     
                     # extract the message
                     message = chunk_data[0]
+                    metadata = chunk_data[1]
+                    if metadata["langgraph_node"] == "tools":
+                        # Sometimes a tool involves invoking a secondary LLM, don't send a message to the UI
+                        # about these.
+                        continue
 
                     if hasattr(message, "content") and message.content:
                         # Check if it's an AIMessage (streamed) content, or a ToolMessage result

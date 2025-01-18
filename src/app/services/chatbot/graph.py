@@ -10,6 +10,7 @@ from langgraph.prebuilt import (  # TODO: check what tools_condition and ToolNod
     ToolNode,
     tools_condition,
 )
+from langgraph.types import interrupt
 from pydantic import BaseModel
 from typing_extensions import Annotated, TypedDict
 
@@ -27,9 +28,8 @@ class State(TypedDict):
     ask_human: bool
 
 
-class RequestAssistance(BaseModel):
-    """Escalate the conversation to an expert. Use this after generating a poem (to check the expert likes the poem)
-    and also before updating an activity (to confirm it's the correct activity).
+class AskHuman(BaseModel):
+    """Ask human for input. Use this before updating an activity (to confirm it's the correct activity).
     """
 
     request: str
@@ -46,7 +46,7 @@ class ChatGraph:
         self.user_id = user_id
         self.tools = get_tools()  # TODO: may need to pass user_id to this one day, so that I fetch the correct StravaClient token
         self.llm = ChatOpenAI(model=MODEL_NAME)
-        self.llm_with_tools = self.llm.bind_tools(self.tools + [RequestAssistance])
+        self.llm_with_tools = self.llm.bind_tools(self.tools + [AskHuman])
         self.system_message = SystemMessage(content=SYSTEM_INSTRUCTIONS)
         self.graph = self._build_graph()
 
@@ -68,7 +68,7 @@ class ChatGraph:
             ask_human = False
             if (
                 response.tool_calls
-                and response.tool_calls[0]["name"] == RequestAssistance.__name__
+                and response.tool_calls[0]["name"] == AskHuman.__name__
             ):
                 ask_human = True
 
@@ -134,7 +134,8 @@ class ChatGraph:
         """
         Determine the next node in the graph.
         """
-        logging.debug(f"_select_next_node is on state {state}!")
+        logging.debug(f"STATE {state}!")
+        logging.debug(state["ask_human"])
         if state["ask_human"]:
             return "human"
         return tools_condition(state)
@@ -155,7 +156,7 @@ class ChatGraph:
         graph_builder.add_conditional_edges(
             "chatbot",
             self._select_next_node,
-            {"human": "human", "tools": "tools", "__end__": "__end__"},
+            # {"human": "human", "tools": "tools", "__end__": "__end__"},
         )
         graph_builder.add_edge("tools", "chatbot")
         graph_builder.add_edge("human", "chatbot")

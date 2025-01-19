@@ -9,7 +9,9 @@ You can ask it to:
     - the agent will interrupt and wait for human confirmation before doing this
 
 ![agent](./assets/agent.png)
+<img src="./assets/agent.png" alt="agent" width="200"/>
 ![strava](./assets/strava.png)
+<img src="./assets/strava.png" alt="strava" width="200"/>
 
 ## LangGraph graph
 

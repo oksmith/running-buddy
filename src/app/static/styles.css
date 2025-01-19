@@ -8,6 +8,7 @@ body {
     align-items: center;
     height: 100vh;
 }
+
 #chat-box {
     width: 800px;
     max-width: 90vw;
@@ -17,8 +18,9 @@ body {
     background-color: #fff;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
+
 #chat-history {
-    height: 600px;
+    height: 500px;
     overflow-y: auto;
     border: 1px solid #ddd;
     padding: 8px;
@@ -26,23 +28,29 @@ body {
     border-radius: 4px;
     background-color: #f9f9f9;
 }
+
 #chat-history div {
     margin-bottom: 10px;
     padding: 8px;
     border-radius: 4px;
 }
+
 .user-message {
     background-color: #d1f7c4;
     align-self: flex-start;
 }
+
 .agent-message {
     background-color: #f0f0f5;
     align-self: flex-end;
 }
-#chat-form label, #chat-form input {
+
+#chat-form label,
+#chat-form input {
     display: block;
     width: 100%;
 }
+
 #chat-form input[type="text"] {
     padding: 8px;
     margin-bottom: 12px;
@@ -50,6 +58,7 @@ body {
     border-radius: 4px;
     box-sizing: border-box;
 }
+
 #chat-form input[type="submit"] {
     background-color: #4CAF50;
     color: white;
@@ -59,9 +68,11 @@ body {
     cursor: pointer;
     width: 100%;
 }
+
 #chat-form input[type="submit"]:hover {
     background-color: #45a049;
 }
+
 .confirmation-dialog {
     background-color: #fff3cd;
     border: 1px solid #ffeeba;
@@ -69,21 +80,58 @@ body {
     margin: 10px 0;
     border-radius: 4px;
 }
+
 .confirmation-buttons {
     margin-top: 10px;
 }
-.confirm-btn, .cancel-btn {
+
+.confirm-btn,
+.cancel-btn {
     padding: 5px 15px;
     margin-right: 10px;
     border: none;
     border-radius: 4px;
     cursor: pointer;
 }
+
 .confirm-btn {
     background-color: #28a745;
     color: white;
 }
+
 .cancel-btn {
     background-color: #dc3545;
     color: white;
+}
+
+.interrupt-message {
+    background-color: #f9e79f;
+    padding: 10px;
+    margin: 5px 0;
+    border: 1px solid #f5b041;
+    border-radius: 4px;
+}
+
+.button-container {
+    display: flex;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.confirm-button {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.cancel-button {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 4px;
 }

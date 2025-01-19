@@ -44,9 +44,7 @@ def select_activity(query: str, activities_file: str) -> Tuple[bool, str]:
     activity_file = "data/selected_activity.json"
 
     try:
-        activity = utils.select_activity_llm(
-            query, activities
-        )
+        activity = utils.select_activity_llm(query, activities)
         found_activity = True
         with open(activity_file, "w") as f:
             json.dump(activity, f)

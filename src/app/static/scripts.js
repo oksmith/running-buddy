@@ -1,9 +1,9 @@
 const form = document.getElementById('chat-form');
 const chatHistory = document.getElementById('chat-history');
 
-form.onsubmit = async function(event) {
+form.onsubmit = async function (event) {
     event.preventDefault();
-    
+
     const messageInput = document.getElementById('message');
     const message = messageInput.value;
     console.log("Sending message:", message);
@@ -20,7 +20,7 @@ form.onsubmit = async function(event) {
     try {
         const response = await fetch('/chat/message', {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ content: message })
@@ -45,10 +45,10 @@ form.onsubmit = async function(event) {
         while (true) {
             const { value, done } = await reader.read();
             if (done) break;
-            
+
             const text = decoder.decode(value);
             console.log("Received text:", text);
-            
+
             const parsedResponse = JSON.parse(text);
             console.log("Parsed response:", parsedResponse);
 
@@ -57,8 +57,9 @@ form.onsubmit = async function(event) {
                 agentMessage.textContent = `Agent: ${currentText}`;
             }
 
-            if (parsedResponse.requires_confirmation) {
-                handleConfirmation(parsedResponse.confirmation_id);
+            if (parsedResponse.interrupt) {
+                await handleInterrupt(parsedResponse);
+                break; // Stop processing additional responses if interrupt is triggered
             }
 
             chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -70,6 +71,53 @@ form.onsubmit = async function(event) {
         errorDiv.className = 'system-message';
         chatHistory.appendChild(errorDiv);
     }
-    
+
     return false;
 };
+
+
+async function handleInterrupt(interruptData) {
+    const interruptMessage = document.createElement('div');
+    interruptMessage.textContent = interruptData.message;
+    interruptMessage.className = 'interrupt-message';
+    chatHistory.appendChild(interruptMessage);
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'button-container';
+    buttonContainer.appendChild(createButton('Confirm', true));
+    buttonContainer.appendChild(createButton('Cancel', false));
+    chatHistory.appendChild(buttonContainer);
+
+    function createButton(text, isConfirm) {
+        const button = document.createElement('button');
+        button.textContent = text;
+        button.className = isConfirm ? 'confirm-button' : 'cancel-button';
+        button.onclick = async () => {
+            buttonContainer.remove();
+            const response = await fetch('/chat/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    confirmed: isConfirm,
+                    user_id: 'test-user-1' // TODO: Replace with actual user ID
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                interruptMessage.textContent = data.message;
+
+                if (!data.interrupt) {
+                    const agentMessage = document.createElement('div');
+                    agentMessage.className = 'agent-message';
+                    agentMessage.textContent = `Agent: ${data.message}`;
+                    chatHistory.appendChild(agentMessage);
+                }
+
+            }
+        };
+        return button;
+    }
+
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}

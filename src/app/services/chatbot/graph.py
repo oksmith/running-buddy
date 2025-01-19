@@ -1,16 +1,15 @@
 import logging
-from typing import AsyncIterator, Dict
+from typing import AsyncIterator, Dict, Optional
+from dataclasses import dataclass
 
 from langchain_core.messages import SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph
 from langgraph.graph.message import add_messages
-from langgraph.prebuilt import (  # TODO: check what tools_condition and ToolNode do again?
-    ToolNode,
-    tools_condition,
-)
+from langgraph.prebuilt import ToolNode
 from typing_extensions import Annotated, TypedDict
+from langgraph.types import interrupt
 
 from src.app.services.chatbot.prompts import SYSTEM_INSTRUCTIONS
 from src.app.services.chatbot.tools import get_tools
@@ -20,8 +19,15 @@ logging.basicConfig(level=logging.DEBUG)
 MODEL_NAME = "gpt-4o-mini"
 
 
+@dataclass
+class InterruptMessage:
+    content: str
+    tool_call: Optional[Dict] = None  # the tool call that is pending
+
+
 class State(TypedDict):
     messages: Annotated[list, add_messages]
+    interrupt: Optional[InterruptMessage]
 
 
 class ChatGraph:
@@ -37,6 +43,7 @@ class ChatGraph:
         self.llm = ChatOpenAI(model=MODEL_NAME)
         self.llm_with_tools = self.llm.bind_tools(self.tools)
         self.system_message = SystemMessage(content=SYSTEM_INSTRUCTIONS)
+        self.config = {"configurable": {"thread_id": "1"}}
         self.graph = self._build_graph()
 
     def _chatbot_node(self, state: State) -> Dict:
@@ -51,19 +58,61 @@ class ChatGraph:
 
         try:
             response = self.llm_with_tools.invoke(messages)
-            logging.debug(f"Tool calls in _chatbot_node: {response.tool_calls}")
             return {"messages": [response]}
 
         except Exception as e:
-            raise Exception(
-                f"Error in chatbot processing: {str(e)}"
-            )  # TODO: custom exception
+            raise Exception(f"Error in chatbot processing: {str(e)}")
+
+    def _tool_node(self, state: State) -> Dict:
+        messages = state["messages"]
+        last_message = messages[-1]
+
+        if hasattr(last_message, "tool_calls") and len(last_message.tool_calls) > 0:
+            for tool_call in last_message.tool_calls:
+                if tool_call["name"] == "update_activity":
+                    logging.warning(
+                        "Detected an update_activity call, interrupting the graph flow!"
+                    )
+                    state["interrupt"] = {
+                        "question": "Would you like to proceed with updating the activity?",
+                        "tool_call": tool_call,
+                    }
+                    response = interrupt(state["interrupt"])
+                    logging.warning(
+                        f"Resuming after human review in _tool_node: {response}"
+                    )
+
+                    if response.get("confirmed"):
+                        # only continue with the tools if the user confirmed
+                        return ToolNode(tools=self.tools).invoke(state)
+
+                    # otherwise, just return current state and continue with the chatbot
+                    return {"messages": messages}
+
+        # invoke tools as per usual if no interruption needed
+        return ToolNode(tools=self.tools).invoke(state)
 
     def _select_next_node(self, state: State) -> str:
         """
         Determine the next node in the graph.
         """
-        return tools_condition(state)
+        # TODO: is this needed? or can we just use `tool_condition`?
+        if state.get("interrupt"):
+            logging.warning("Interrupt detected, moving to chatbot node")
+            return "chatbot"
+
+        if isinstance(state, list):
+            ai_message = state[-1]
+        elif isinstance(state, dict) and (messages := state.get("messages", [])):
+            ai_message = messages[-1]
+        elif messages := getattr(state, "messages", []):
+            ai_message = messages[-1]
+        else:
+            raise ValueError(f"No messages found in input state to tool_edge: {state}")
+
+        if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
+            return "tools"
+        return "__end__"
 
     def _build_graph(self) -> StateGraph:
         """
@@ -73,7 +122,7 @@ class ChatGraph:
 
         # Add nodes to the graph
         graph_builder.add_node("chatbot", self._chatbot_node)
-        graph_builder.add_node("tools", ToolNode(tools=self.tools))
+        graph_builder.add_node("tools", self._tool_node)
 
         # Add edges to the graph (there is a conditional edge between chatbot and human/tools
         # but we always go to chatbot from the human/tools nodes)
@@ -85,10 +134,7 @@ class ChatGraph:
 
         # Put it all together
         graph_builder.set_entry_point("chatbot")
-        memory = MemorySaver()
-        return graph_builder.compile(
-            checkpointer=memory
-        )
+        return graph_builder.compile(checkpointer=MemorySaver())
 
     async def process_message_stream(self, message: str) -> AsyncIterator[Dict]:
         """
@@ -104,11 +150,10 @@ class ChatGraph:
             initial_state = {
                 "messages": [{"role": "user", "content": message}],
             }
-            config = {"configurable": {"thread_id": "1"}}
 
             # Stream both values and LLM messages
             async for chunk in self.graph.astream(
-                initial_state, config, stream_mode=["values", "messages"]
+                initial_state, self.config, stream_mode=["values", "messages"]
             ):
                 yield chunk
 
@@ -117,6 +162,7 @@ class ChatGraph:
 
 
 # Factory function to get or create a chat graph for multiple users
+# TODO: actually do this lol
 _user_graphs: Dict[str, ChatGraph] = {}
 
 

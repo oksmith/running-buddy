@@ -2,6 +2,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from langgraph.types import Command
 
 from src.app.models.chat import ChatMessage, ChatResponse
 from src.app.services.chatbot.graph import get_chat_graph
@@ -38,8 +39,12 @@ async def send_message(message: ChatMessage, current_user=Depends(get_current_us
                 chunk_type, chunk_data = chunk
 
                 if chunk_type == "messages":
+                    logging.debug(
+                        f"Processing chunk - type: {chunk_type}, data: {chunk_data}"
+                    )
                     if chunk_data and isinstance(chunk_data, list):
                         final_message += chunk_data[0].content
+
                 elif chunk_type == "values":
                     logging.debug(
                         f"Processing chunk - type: {chunk_type}, data: {chunk_data}"
@@ -49,6 +54,41 @@ async def send_message(message: ChatMessage, current_user=Depends(get_current_us
             except Exception as e:
                 logging.error(f"Error processing chunk: {chunk}, error: {e}")
 
-        return ChatResponse(message=final_message)
+        logging.debug(f"Graph state tasks: {graph.graph.get_state(graph.config).tasks}")
+        tasks = graph.graph.get_state(graph.config).tasks
+        try:
+            if (
+                len(tasks) > 0
+                and hasattr(tasks[0], "interrupts")
+                and len(tasks[0].interrupts) > 0
+            ):
+                interrupt = tasks[0].interrupts[0]
+                # e.g. Interrupt(value={'question': 'Would you like to proceed with updating the activity?', 'tool_call': {'name': 'update_activity', 'args': { ... }}, resumable=True, ns=['tools:1913bc93-971a-5dcb-af78-ab4fcf271b48'], when='during')
+                return ChatResponse(message=interrupt.value["question"], interrupt=True)
+        except Exception as e:
+            logging.error(f"Error getting interrupts: {e}")
+
+        logging.debug("Final message: " + final_message)
+        return ChatResponse(message=final_message, interrupt=False)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class ConfirmationRequest(BaseModel):
+    confirmed: bool  # Whether the user confirmed the action
+    user_id: str  # ID of the user confirming the action
+
+
+@router.post("/confirm")
+async def confirm_tool_call(request: ConfirmationRequest):
+    graph = get_chat_graph(request.user_id)
+    thread_config = {"configurable": {"thread_id": "1"}}
+
+    # Resume the graph with the confirmation
+    response = await graph.graph.ainvoke(
+        Command(resume={"confirmed": request.confirmed}), config=thread_config
+    )
+    logging.debug(f"Response from graph: {response}")
+
+    return ChatResponse(message="Action processed")

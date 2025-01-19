@@ -103,3 +103,35 @@ body {
     background-color: #dc3545;
     color: white;
 }
+
+.interrupt-message {
+    background-color: #f9e79f;
+    padding: 10px;
+    margin: 5px 0;
+    border: 1px solid #f5b041;
+    border-radius: 4px;
+}
+
+.button-container {
+    display: flex;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.confirm-button {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.cancel-button {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+}

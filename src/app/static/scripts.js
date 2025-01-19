@@ -99,12 +99,21 @@ async function handleInterrupt(interruptData) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     confirmed: isConfirm,
-                    user_id: 'test-user-1'
+                    user_id: 'test-user-1' // TODO: Replace with actual user ID
                 })
             });
 
             if (response.ok) {
-                interruptMessage.textContent = isConfirm ? 'Confirmed.' : 'Cancelled.';
+                const data = await response.json();
+                interruptMessage.textContent = data.message;
+
+                if (!data.interrupt) {
+                    const agentMessage = document.createElement('div');
+                    agentMessage.className = 'agent-message';
+                    agentMessage.textContent = `Agent: ${data.message}`;
+                    chatHistory.appendChild(agentMessage);
+                }
+
             }
         };
         return button;

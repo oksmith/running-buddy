@@ -1,4 +1,5 @@
 POEM_INSTRUCTIONS = """When generating poems:
+- If it's about a run, they probably want you to fetch activity data from Strava
 - Use details about where the athlete ran like street names and parks
 - Structure the poem with clear rhythm and flow
 - Keep it to 8 lines

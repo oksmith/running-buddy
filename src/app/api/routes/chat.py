@@ -19,6 +19,7 @@ class User(BaseModel):
 def get_current_user() -> User:
     """
     TODO: this needs proper filling in if I want to host the app for many users.
+    We also need to pass it in loads of different places... frontend needs it, backend needs it, etc.
     """
     return User(id="test-user-1")
 
@@ -63,7 +64,12 @@ async def send_message(message: ChatMessage, current_user=Depends(get_current_us
                 and len(tasks[0].interrupts) > 0
             ):
                 interrupt = tasks[0].interrupts[0]
-                # e.g. Interrupt(value={'question': 'Would you like to proceed with updating the activity?', 'tool_call': {'name': 'update_activity', 'args': { ... }}, resumable=True, ns=['tools:1913bc93-971a-5dcb-af78-ab4fcf271b48'], when='during')
+                # e.g. Interrupt(
+                #   value={'question': 'Would you like to proceed with updating the activity?', 'tool_call': {'name': 'update_activity', 'args': { ... }},
+                #   resumable=True,
+                #   ns=['tools:1913bc93-971a-5dcb-af78-ab4fcf271b48'],
+                #   when='during'
+                # )
                 return ChatResponse(message=interrupt.value["question"], interrupt=True)
         except Exception as e:
             logging.error(f"Error getting interrupts: {e}")
@@ -76,8 +82,8 @@ async def send_message(message: ChatMessage, current_user=Depends(get_current_us
 
 
 class ConfirmationRequest(BaseModel):
-    confirmed: bool  # Whether the user confirmed the action
-    user_id: str  # ID of the user confirming the action
+    confirmed: bool
+    user_id: str
 
 
 @router.post("/confirm")
@@ -89,6 +95,7 @@ async def confirm_tool_call(request: ConfirmationRequest):
     response = await graph.graph.ainvoke(
         Command(resume={"confirmed": request.confirmed}), config=thread_config
     )
-    logging.debug(f"Response from graph: {response}")
+    latest_message = response["messages"][-1]
+    logging.debug(f"Response from graph, after human confirmation: {latest_message}")
 
-    return ChatResponse(message="Action processed")
+    return ChatResponse(message=latest_message.content, interrupt=False)

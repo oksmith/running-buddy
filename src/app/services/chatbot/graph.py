@@ -7,12 +7,9 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph
 from langgraph.graph.message import add_messages
-from langgraph.prebuilt import (  # TODO: check what tools_condition and ToolNode do again?
-    ToolNode,
-    tools_condition,
-)
+from langgraph.prebuilt import ToolNode
 from typing_extensions import Annotated, TypedDict
-from langgraph.types import interrupt, Command
+from langgraph.types import interrupt
 
 from src.app.services.chatbot.prompts import SYSTEM_INSTRUCTIONS
 from src.app.services.chatbot.tools import get_tools
@@ -25,13 +22,12 @@ MODEL_NAME = "gpt-4o-mini"
 @dataclass
 class InterruptMessage:
     content: str
-    tool_call: Optional[Dict] = None
+    tool_call: Optional[Dict] = None  # the tool call that is pending
 
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
     interrupt: Optional[InterruptMessage]
-    pending_tool_call: Optional[Dict]
 
 
 class ChatGraph:
@@ -54,8 +50,6 @@ class ChatGraph:
         """
         Process messages through the chatbot.
         """
-        logging.debug(f"DEBUGGING: state in _chatbot_node: {state}")
-
         messages = state["messages"]
 
         # Add system message if it's not present
@@ -64,98 +58,47 @@ class ChatGraph:
 
         try:
             response = self.llm_with_tools.invoke(messages)
-            logging.debug(f"Tool calls in _chatbot_node: {response.tool_calls}")
             return {"messages": [response]}
 
         except Exception as e:
             raise Exception(f"Error in chatbot processing: {str(e)}")
 
     def _tool_node(self, state: State) -> Dict:
-        logging.debug(f"DEBUGGING: state in _tool_node: {state}")
         messages = state["messages"]
         last_message = messages[-1]
 
         if hasattr(last_message, "tool_calls") and len(last_message.tool_calls) > 0:
             for tool_call in last_message.tool_calls:
                 if tool_call["name"] == "update_activity":
-                    logging.debug("DETECTED update_activity CALL")
+                    logging.warning(
+                        "Detected an update_activity call, interrupting the graph flow!"
+                    )
                     state["interrupt"] = {
                         "question": "Would you like to proceed with updating the activity?",
                         "tool_call": tool_call,
                     }
                     response = interrupt(state["interrupt"])
-                    logging.debug(
-                        f"DEBUGGING: resuming after human review in _tool_node: {response}"
+                    logging.warning(
+                        f"Resuming after human review in _tool_node: {response}"
                     )
 
                     if response.get("confirmed"):
+                        # only continue with the tools if the user confirmed
                         return ToolNode(tools=self.tools).invoke(state)
+
+                    # otherwise, just return current state and continue with the chatbot
                     return {"messages": messages}
 
+        # invoke tools as per usual if no interruption needed
         return ToolNode(tools=self.tools).invoke(state)
-
-    # def _tool_node(self, state: State) -> Dict:
-    #     logging.debug(f"DEBUGGING: state in _tool_node: {state}")
-
-    #     """
-    #     {'messages': [AIMessage(content='', additional_kwargs={'tool_calls': [{'index': 0, 'id': 'call_Sz2pyDFAImbXvRUolb2gs8Wy', 'function': {'arguments': '{"query":"this morning"}', 'name': 'fetch_activities'}, 'type': 'function'}]}, response_metadata={'finish_reason': 'tool_calls', 'model_name': 'gpt-4o-mini-2024-07-18', 'system_fingerprint': 'fp_72ed7ab54c'}, id='run-2a31061d-b244-40ae-ae58-522b13e4998b', tool_calls=[{'name': 'fetch_activities', 'args': {'query': 'this morning'}, 'id': 'call_Sz2pyDFAImbXvRUolb2gs8Wy', 'type': 'tool_call'}])]}
-    #     """
-
-    #     messages = state["messages"]
-    #     last_message = messages[-1]
-    #     if hasattr(last_message, "tool_calls") and len(last_message.tool_calls) > 0:
-    #         tool_calls = last_message.tool_calls
-    #         for tool_call in tool_calls:
-    #             if tool_call["name"] == "update_activity":
-    #                 # Store the pending tool call in state
-    #                 state["pending_tool_call"] = tool_call
-
-    #                 # Interrupt the flow to confirm the tool call
-    #                 logging.debug("DETECTED update_activity CALL")
-    #                 human_review = interrupt(
-    #                     {
-    #                         "question": "Would you like to proceed with updating the activity?",
-    #                         "tool_call": tool_call,
-    #                     }
-    #                 )
-    #                 logging.debug(
-    #                     f"DEBUGGING: human_review in _tool_node: {human_review}"
-    #                 )
-
-    #                 return Command(
-    #                     goto="interrupted",  # Set to a custom state for interruptions
-    #                     update={"interrupt_message": human_review},
-    #                 )
-    #                 # # Route based on human input
-    #                 # if human_review.get("action") == "approve":
-    #                 #     # Continue with the original tool call
-    #                 #     return Command(goto="run_tool")
-    #                 # elif human_review.get("action") == "modify":
-    #                 #     # Update the tool call with human modifications
-    #                 #     updated_tool_call = human_review.get("updated_tool_call")
-    #                 #     return Command(
-    #                 #         goto="run_tool",
-    #                 #         update={"messages": [updated_tool_call]},
-    #                 #     )
-    #                 # elif human_review.get("action") == "feedback":
-    #                 #     # Provide feedback for adjustment
-    #                 #     feedback_message = human_review.get("feedback_message")
-    #                 #     return Command(
-    #                 #         goto="call_llm",
-    #                 #         update={"messages": [feedback_message]},
-    #                 #     )
-    #                 # else:
-    #                 #     # If no clear action, return to the previous state or take a fallback path
-    #                 #     return Command(goto="previous_node")
-
-    #     # If no interruption needed, proceed with ToolNode invocation
-    #     return ToolNode(tools=self.tools).invoke(state)
 
     def _select_next_node(self, state: State) -> str:
         """
         Determine the next node in the graph.
         """
+        # TODO: is this needed? or can we just use `tool_condition`?
         if state.get("interrupt"):
+            logging.warning("Interrupt detected, moving to chatbot node")
             return "chatbot"
 
         if isinstance(state, list):
@@ -219,6 +162,7 @@ class ChatGraph:
 
 
 # Factory function to get or create a chat graph for multiple users
+# TODO: actually do this lol
 _user_graphs: Dict[str, ChatGraph] = {}
 
 

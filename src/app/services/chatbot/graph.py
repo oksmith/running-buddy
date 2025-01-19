@@ -1,5 +1,6 @@
 import logging
-from typing import AsyncIterator, Dict
+from typing import AsyncIterator, Dict, Optional
+from dataclasses import dataclass
 
 from langchain_core.messages import SystemMessage
 from langchain_openai import ChatOpenAI
@@ -20,8 +21,16 @@ logging.basicConfig(level=logging.DEBUG)
 MODEL_NAME = "gpt-4o-mini"
 
 
+@dataclass
+class InterruptMessage:
+    content: str
+    tool_call: Optional[Dict] = None
+
+
 class State(TypedDict):
     messages: Annotated[list, add_messages]
+    interrupt: Optional[InterruptMessage]
+    pending_tool_call: Optional[Dict]
 
 
 class ChatGraph:
@@ -86,9 +95,7 @@ class ChatGraph:
         # Put it all together
         graph_builder.set_entry_point("chatbot")
         memory = MemorySaver()
-        return graph_builder.compile(
-            checkpointer=memory
-        )
+        return graph_builder.compile(checkpointer=memory)
 
     async def process_message_stream(self, message: str) -> AsyncIterator[Dict]:
         """

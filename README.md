@@ -8,6 +8,13 @@ You can ask it to:
 - ask it to update the activity description on Strava
     - the agent will interrupt and wait for human confirmation before doing this
 
+## Frameworks used
+
+- LangGraph for the AI agent
+- FastAPI for backend API
+- Basic HTML with javascript for the UI
+
+## Usage screenshots
 <img src="./assets/agent.png" alt="agent" width="700"/>
 An updated Strava post, based on the above interaction:
 <img src="./assets/strava.png" alt="strava" width="400"/>

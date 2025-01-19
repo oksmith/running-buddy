@@ -9,6 +9,7 @@ class ChatMessage(BaseModel):
 
 class ChatResponse(BaseModel):
     message: str
+    interrupt: str | None = None
 
 
 class ChatSession(BaseModel):

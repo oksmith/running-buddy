@@ -1,16 +1,16 @@
 import logging
-from typing import AsyncIterator, Dict
+import json
+from typing import AsyncIterator, Dict, Optional, Literal
+from dataclasses import dataclass
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph
 from langgraph.graph.message import add_messages
-from langgraph.prebuilt import (  # TODO: check what tools_condition and ToolNode do again?
-    ToolNode,
-    tools_condition,
-)
+from langgraph.prebuilt import ToolNode
 from typing_extensions import Annotated, TypedDict
+
 
 from src.app.services.chatbot.prompts import SYSTEM_INSTRUCTIONS
 from src.app.services.chatbot.tools import get_tools
@@ -20,8 +20,16 @@ logging.basicConfig(level=logging.DEBUG)
 MODEL_NAME = "gpt-4o-mini"
 
 
+@dataclass
+class InterruptMessage:
+    content: str
+    tool_call: Optional[Dict] = None
+
+
 class State(TypedDict):
     messages: Annotated[list, add_messages]
+    interrupt: Optional[InterruptMessage]
+    pending_tool_call: Optional[Dict]
 
 
 class ChatGraph:
@@ -40,55 +48,63 @@ class ChatGraph:
         self.graph = self._build_graph()
 
     def _chatbot_node(self, state: State) -> Dict:
-        """
-        Process messages through the chatbot.
-        """
         messages = state["messages"]
-
-        # Add system message if it's not present
         if not any(isinstance(msg, SystemMessage) for msg in messages):
             messages = [self.system_message] + messages
 
-        try:
-            response = self.llm_with_tools.invoke(messages)
-            logging.debug(f"Tool calls in _chatbot_node: {response.tool_calls}")
-            return {"messages": [response]}
+        response = self.llm_with_tools.invoke(messages)
 
-        except Exception as e:
-            raise Exception(
-                f"Error in chatbot processing: {str(e)}"
-            )  # TODO: custom exception
+        if hasattr(response, "tool_calls") and response.tool_calls:
+            tool_call = response.tool_calls[0]
+            if tool_call.function.name == "update_strava_activity":
+                args = json.loads(tool_call.function.arguments)
+                return {
+                    "messages": messages + [response],
+                    "interrupt": InterruptMessage(
+                        content=f"Would you like to update the Strava activity with this poem?\n\n{args['description']}\n\nReply 'yes' to confirm or 'no' to cancel.",
+                        tool_call=tool_call,
+                    ),
+                    "pending_tool_call": None,
+                }
 
-    def _select_next_node(self, state: State) -> str:
-        """
-        Determine the next node in the graph.
-        """
-        return tools_condition(state)
+        return {
+            "messages": messages + [response],
+            "interrupt": None,
+            "pending_tool_call": None,
+        }
+
+    def _tools_node(self, state: State) -> Dict:
+        if state.get("interrupt"):
+            # Don't execute tools if we're waiting for confirmation
+            return state
+
+        tool_executor = ToolNode(tools=self.tools)
+        result = tool_executor.invoke(state)
+        return {
+            "messages": state["messages"] + [result],
+            "interrupt": None,
+            "pending_tool_call": None,
+        }
+
+    def _select_next(self, state: State) -> Literal["chatbot", "tools"]:
+        if state.get("interrupt"):
+            return "chatbot"
+        last_message = state["messages"][-1]
+        return "tools" if hasattr(last_message, "tool_calls") else "chatbot"
 
     def _build_graph(self) -> StateGraph:
-        """
-        Build the graph structure.
-        """
-        graph_builder = StateGraph(State)
+        graph = StateGraph(State)
 
-        # Add nodes to the graph
-        graph_builder.add_node("chatbot", self._chatbot_node)
-        graph_builder.add_node("tools", ToolNode(tools=self.tools))
+        graph.add_node("chatbot", self._chatbot_node)
+        graph.add_node("tools", self._tools_node)
 
-        # Add edges to the graph (there is a conditional edge between chatbot and human/tools
-        # but we always go to chatbot from the human/tools nodes)
-        graph_builder.add_conditional_edges(
-            "chatbot",
-            self._select_next_node,
+        graph.add_conditional_edges(
+            "chatbot", self._select_next, {"chatbot": "chatbot", "tools": "tools"}
         )
-        graph_builder.add_edge("tools", "chatbot")
+        graph.add_edge("tools", "chatbot")
 
-        # Put it all together
-        graph_builder.set_entry_point("chatbot")
-        memory = MemorySaver()
-        return graph_builder.compile(
-            checkpointer=memory
-        )
+        graph.set_entry_point("chatbot")
+        return graph.compile(checkpointer=MemorySaver())
 
     async def process_message_stream(self, message: str) -> AsyncIterator[Dict]:
         """
@@ -100,20 +116,18 @@ class ChatGraph:
         Returns:
             AsyncIterator[Dict]: Stream of updates from the graph processing
         """
-        try:
-            initial_state = {
-                "messages": [{"role": "user", "content": message}],
-            }
-            config = {"configurable": {"thread_id": "1"}}
+        initial_state = {
+            "messages": [HumanMessage(content=message)],
+            "interrupt": None,
+            "pending_tool_call": None,
+        }
 
-            # Stream both values and LLM messages
-            async for chunk in self.graph.astream(
-                initial_state, config, stream_mode=["values", "messages"]
-            ):
-                yield chunk
-
-        except Exception as e:
-            raise Exception(f"Error processing message stream: {str(e)}")
+        async for chunk in self.graph.astream(
+            initial_state,
+            {"configurable": {"thread_id": "1"}},
+            stream_mode=["values", "messages"],
+        ):
+            yield chunk
 
 
 # Factory function to get or create a chat graph for multiple users

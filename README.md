@@ -9,7 +9,8 @@ You can ask it to:
     - the agent will interrupt and wait for human confirmation before doing this
 
 <img src="./assets/agent.png" alt="agent" width="600"/>
-<img src="./assets/strava.png" alt="strava" width="600"/>
+An updated Strava post, based on the above interaction:
+<img src="./assets/strava.png" alt="strava" width="400"/>
 
 ## LangGraph graph
 

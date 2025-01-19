@@ -47,7 +47,6 @@ async def send_message(message: ChatMessage, current_user=Depends(get_current_us
                     logging.debug(f"Processing chunk - type: {chunk_type}, data: {chunk_data}")
                     last_message = chunk_data["messages"][-1]
                     final_message = last_message.content
-                    requires_confirmation = getattr(chunk_data, "ask_human", False)
             except Exception as e:
                 logging.error(f"Error processing chunk: {chunk}, error: {e}")
 

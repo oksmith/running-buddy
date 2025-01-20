@@ -13,8 +13,9 @@ from langgraph.types import interrupt
 
 from src.app.services.chatbot.prompts import SYSTEM_INSTRUCTIONS
 from src.app.services.chatbot.tools import get_tools
+from src.app.utils.logger import setup_logger
 
-logging.basicConfig(level=logging.INFO)
+logger = setup_logger(name="graph", level=logging.INFO, log_file="graph.log")
 
 MODEL_NAME = "gpt-4o-mini"
 
@@ -70,7 +71,7 @@ class ChatGraph:
         if hasattr(last_message, "tool_calls") and len(last_message.tool_calls) > 0:
             for tool_call in last_message.tool_calls:
                 if tool_call["name"] == "update_activity":
-                    logging.info(
+                    logger.info(
                         "Detected an update_activity call, interrupting the graph flow!"
                     )
                     state["interrupt"] = {
@@ -78,7 +79,7 @@ class ChatGraph:
                         "tool_call": tool_call,
                     }
                     response = interrupt(state["interrupt"])
-                    logging.info(
+                    logger.info(
                         f"Resuming after human review in _tool_node: {response}"
                     )
 
@@ -98,7 +99,7 @@ class ChatGraph:
         """
         # TODO: is this needed? or can we just use `tool_condition`?
         if state.get("interrupt"):
-            logging.info("Interrupt detected, moving to chatbot node")
+            logger.info("Interrupt detected, moving to chatbot node")
             return "chatbot"
 
         if isinstance(state, list):

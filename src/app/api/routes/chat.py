@@ -9,8 +9,9 @@ from langgraph.types import Command
 from src.app.models.chat import ChatMessage, ChatResponse
 from src.app.services.chatbot.graph import get_chat_graph
 from src.app.services.chatbot.tools import TOOL_CALL_MESSAGES
+from src.app.utils.logger import setup_logger
 
-logging.basicConfig(level=logging.INFO)
+logger = setup_logger(name="chat_app", level=logging.INFO, log_file="chat.log")
 
 router = APIRouter()
 
@@ -44,14 +45,14 @@ async def send_message_stream(
 
                 async for chunk in graph.process_message_stream(message.content):
                     if not isinstance(chunk, tuple):
-                        logging.error(f"Unexpected chunk format: {chunk}")
+                        logger.error(f"Unexpected chunk format: {chunk}")
                         continue
 
                     try:
                         chunk_type, chunk_data = chunk
 
                         if chunk_type == "messages":
-                            logging.debug(
+                            logger.debug(
                                 f"Processing chunk - type: {chunk_type}, data: {chunk_data}"
                             )
                             if chunk_data and isinstance(chunk_data, list):
@@ -62,7 +63,7 @@ async def send_message_stream(
                                     )
 
                         elif chunk_type == "values":
-                            logging.debug(
+                            logger.debug(
                                 f"Processing chunk - type: {chunk_type}, data: {chunk_data}"
                             )
                             last_message = chunk_data["messages"][-1]
@@ -71,7 +72,7 @@ async def send_message_stream(
                                 and last_message.tool_calls
                             ):
                                 tool_name = last_message.tool_calls[0]["name"]
-                                logging.info(
+                                logger.info(
                                     f"Tool calls detected in last message [values]: {last_message.tool_calls}"
                                 )
                                 yield (
@@ -90,7 +91,7 @@ async def send_message_stream(
                             yield json.dumps({"message": current_message}) + "\n"
 
                     except Exception as e:
-                        logging.error(f"Error processing chunk: {chunk}, error: {e}")
+                        logger.error(f"Error processing chunk: {chunk}, error: {e}")
                         continue
 
                 # Check for interrupts at the end
@@ -109,7 +110,7 @@ async def send_message_stream(
                     )
 
             except Exception as e:
-                logging.error(f"Streaming error: {e}")
+                logger.error(f"Streaming error: {e}")
                 yield json.dumps({"error": str(e)}) + "\n"
 
         return StreamingResponse(generate_response(), media_type="text/event-stream")
@@ -133,8 +134,7 @@ async def confirm_tool_call(request: ConfirmationRequest):
         Command(resume={"confirmed": request.confirmed}), config=thread_config
     )
     latest_message = response["messages"][-1]
-    logging.debug(f"Response from graph, after human confirmation: {latest_message}")
-
+    logger.info(f"Response from graph, after human confirmation: {latest_message}")
     return ChatResponse(message=latest_message.content, interrupt=False)
 
 
@@ -156,21 +156,21 @@ async def send_message_static(
 
         async for chunk in graph.process_message_stream(message.content):
             if not isinstance(chunk, tuple):
-                logging.error(f"Unexpected chunk format: {chunk}")
+                logger.error(f"Unexpected chunk format: {chunk}")
                 continue
 
             try:
                 chunk_type, chunk_data = chunk
 
                 if chunk_type == "messages":
-                    logging.debug(
+                    logger.debug(
                         f"Processing chunk - type: {chunk_type}, data: {chunk_data}"
                     )
                     if chunk_data and isinstance(chunk_data, list):
                         final_message += chunk_data[0].content
 
                 elif chunk_type == "values":
-                    logging.debug(
+                    logger.debug(
                         f"Processing chunk - type: {chunk_type}, data: {chunk_data}"
                     )
                     last_message = chunk_data["messages"][-1]
@@ -182,14 +182,14 @@ async def send_message_static(
                         in_progress_message = TOOL_CALL_MESSAGES[
                             last_message.tool_calls[0]["name"]
                         ]
-                        logging.info(
+                        logger.info(
                             f"Tool calls detected in last message [values]: {last_message.tool_calls} :: {in_progress_message}"
                         )
 
             except Exception as e:
-                logging.error(f"Error processing chunk: {chunk}, error: {e}")
+                logger.error(f"Error processing chunk: {chunk}, error: {e}")
 
-        logging.info(f"Graph state tasks: {graph.graph.get_state(graph.config).tasks}")
+        logger.info(f"Graph state tasks: {graph.graph.get_state(graph.config).tasks}")
         tasks = graph.graph.get_state(graph.config).tasks
         try:
             if (
@@ -206,9 +206,9 @@ async def send_message_static(
                 # )
                 return ChatResponse(message=interrupt.value["question"], interrupt=True)
         except Exception as e:
-            logging.error(f"Error getting interrupts: {e}")
+            logger.error(f"Error getting interrupts: {e}")
 
-        logging.info("Final message: " + final_message)
+        logger.info("Final message: " + final_message)
         return ChatResponse(message=final_message, interrupt=False)
 
     except Exception as e:

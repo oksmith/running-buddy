@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
+
 load_dotenv()
 
 APP_CLIENT_ID = os.getenv("APP_CLIENT_ID")

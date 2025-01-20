@@ -7,7 +7,7 @@ from langgraph.types import Command
 from src.app.models.chat import ChatMessage, ChatResponse
 from src.app.services.chatbot.graph import get_chat_graph
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 router = APIRouter()
 
@@ -55,7 +55,7 @@ async def send_message(message: ChatMessage, current_user=Depends(get_current_us
             except Exception as e:
                 logging.error(f"Error processing chunk: {chunk}, error: {e}")
 
-        logging.debug(f"Graph state tasks: {graph.graph.get_state(graph.config).tasks}")
+        logging.info(f"Graph state tasks: {graph.graph.get_state(graph.config).tasks}")
         tasks = graph.graph.get_state(graph.config).tasks
         try:
             if (
@@ -74,7 +74,7 @@ async def send_message(message: ChatMessage, current_user=Depends(get_current_us
         except Exception as e:
             logging.error(f"Error getting interrupts: {e}")
 
-        logging.debug("Final message: " + final_message)
+        logging.info("Final message: " + final_message)
         return ChatResponse(message=final_message, interrupt=False)
 
     except Exception as e:

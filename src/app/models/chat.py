@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Optional, Union
 
 from pydantic import BaseModel
 
@@ -8,8 +8,10 @@ class ChatMessage(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    message: str
+    message: str = ""
     interrupt: bool = False
+    tool_status: Optional[str] = None
+    error: Optional[str] = None
 
 
 class ChatSession(BaseModel):

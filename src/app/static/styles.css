@@ -135,3 +135,30 @@ body {
     cursor: pointer;
     border-radius: 4px;
 }
+
+.status-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid #e5e5e5;
+    border-top: 2px solid #666;
+    border-radius: 50%;
+    margin: 0 4px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}

@@ -14,7 +14,7 @@ from langgraph.types import interrupt
 from src.app.services.chatbot.prompts import SYSTEM_INSTRUCTIONS
 from src.app.services.chatbot.tools import get_tools
 
-logging.basicConfig(level=logging._SysExcInfoType)
+logging.basicConfig(level=logging.INFO)
 
 MODEL_NAME = "gpt-4o-mini"
 

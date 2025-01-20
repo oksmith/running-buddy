@@ -15,7 +15,7 @@ from src.app.services.chatbot.prompts import SYSTEM_INSTRUCTIONS
 from src.app.services.chatbot.tools import get_tools
 from src.app.utils.logger import setup_logger
 
-logger = setup_logger(name="chat_app", level=logging.INFO, log_file="graph.log")
+logger = setup_logger(name="graph", level=logging.INFO, log_file="graph.log")
 
 MODEL_NAME = "gpt-4o-mini"
 

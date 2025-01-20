@@ -1,11 +1,48 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Running Buddy</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+            text-align: center;
+        }
+
+        .button-container {
+            margin-top: 20px;
+        }
+
+        .authorize-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            font-size: 18px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            text-decoration: none;
+        }
+
+        .authorize-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
 </head>
+
 <body>
     <h1>Welcome to Running Buddy!</h1>
-    <p><a href="/auth/authorize-url">Authorize with Strava</a></p>
+    <div class="button-container">
+        <a href="/auth/authorize-url" class="authorize-btn">Authorize with Strava</a>
+    </div>
 </body>
+
 </html>

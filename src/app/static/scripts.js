@@ -10,7 +10,7 @@ form.onsubmit = async function (event) {
 
     // Add user message
     const userMessage = document.createElement('div');
-    userMessage.textContent = `You: ${message}`;
+    userMessage.innerHTML = `<strong>You:</strong> ${message}`;
     userMessage.className = 'user-message';
     chatHistory.appendChild(userMessage);
 
@@ -37,7 +37,7 @@ form.onsubmit = async function (event) {
         const agentMessage = document.createElement('div');
         agentMessage.className = 'agent-message';
         agentMessage.style.whiteSpace = 'pre-wrap';
-        agentMessage.textContent = 'Agent: ';
+        agentMessage.innerHTML = '<strong>Agent:</strong> ';
         chatHistory.appendChild(agentMessage);
 
         let currentText = '';
@@ -54,7 +54,7 @@ form.onsubmit = async function (event) {
 
             if (parsedResponse.message) {
                 currentText += parsedResponse.message;
-                agentMessage.textContent = `Agent: ${currentText}`;
+                agentMessage.innerHTML = `<strong>Agent:</strong> ${currentText}`;
             }
 
             if (parsedResponse.interrupt) {
@@ -106,14 +106,6 @@ async function handleInterrupt(interruptData) {
             if (response.ok) {
                 const data = await response.json();
                 interruptMessage.textContent = data.message;
-
-                if (!data.interrupt) {
-                    const agentMessage = document.createElement('div');
-                    agentMessage.className = 'agent-message';
-                    agentMessage.textContent = `Agent: ${data.message}`;
-                    chatHistory.appendChild(agentMessage);
-                }
-
             }
         };
         return button;

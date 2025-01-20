@@ -1,9 +1,18 @@
 import json
-from typing import Tuple
+from typing import Dict, Tuple
 
 from src.app.services.chatbot import utils
 from src.app.services.googlemaps.client import GMapsClient
 from src.app.services.strava.client import StravaClient, get_access_token
+
+
+TOOL_CALL_MESSAGES: Dict = {
+    "fetch_activities": "Fetching activities...",
+    "select_activity": "Selecting activity...",
+    "read_activity": "Reading activity...",
+    "enrich_activity": "Enriching activity...",
+    "update_activity": "Updating activity...",
+}
 
 
 def fetch_activities(query: str) -> str:

@@ -135,7 +135,6 @@ async def confirm_tool_call(request: ConfirmationRequest):
     )
     latest_message = response["messages"][-1]
     logger.info(f"Response from graph, after human confirmation: {latest_message}")
-
     return ChatResponse(message=latest_message.content, interrupt=False)
 
 

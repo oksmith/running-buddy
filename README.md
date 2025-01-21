@@ -14,8 +14,10 @@ You can ask it to:
 - FastAPI for backend API
 - Basic HTML with javascript for the UI
 
-## Usage screenshots
-<img src="./assets/agent.png" alt="agent" width="700"/>
+## Usage demo
+
+![demo](./assets/agent.gif)
+
 An updated Strava post, based on the above interaction:
 <img src="./assets/strava.png" alt="strava" width="400"/>
 
@@ -24,7 +26,7 @@ An updated Strava post, based on the above interaction:
 ![graph](./assets/graph.png)
 
 ## Setup
-### Using my app
+### Using the app
 I currently only have it working locally, but I'm hoping to get friends to try it out soon where I'll host it somewhere for a short period of time. At time of writing you'll need to set up the app yourself and run it.
 ### Setting up the app
 - To run this yourself, you'll first need to create an app here: https://www.strava.com/settings/api 

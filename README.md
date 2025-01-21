@@ -19,6 +19,7 @@ You can ask it to:
 ![demo](./assets/agent.gif)
 
 An updated Strava post, based on the above interaction:
+
 <img src="./assets/strava.png" alt="strava" width="400"/>
 
 ## LangGraph graph
